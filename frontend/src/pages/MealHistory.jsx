@@ -1,0 +1,12 @@
+import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import Navbar from "../components/Navbar";
+import MenuImage from "../components/MenuImage";
+import api, { errorMessage } from "../services/api";
+import "../components/customerJourney.css";
+export default function MealHistory() {
+  const [data, setData] = useState(null), [error, setError] = useState("");
+  const load = useCallback(async () => { try { const r = await api.get("/customer/activity"); setData(r.data); setError(""); } catch (e) { setError(errorMessage(e)); } }, []);
+  useEffect(() => { const t = setTimeout(load, 0), i = setInterval(load, 15000); return () => { clearTimeout(t); clearInterval(i); }; }, [load]);
+  return <><Navbar title="Meal history" /><main className="dashboard journey-page"><section className="welcome"><div><p className="eyebrow">YOUR ORDERED MEALS</p><h1>Meal history</h1><p>View your ordered meals, delivery status and meal ratings.</p></div></section>{error && <p className="alert error" role="alert">{error}</p>}{!data ? <p role="status">Loading your meals…</p> : <section className="management-card"><h2>Your meals</h2>{!data.meals.length ? <div className="empty-card"><h3>No meals ordered yet</h3><p>Your meals will appear here once your booking is confirmed.</p><Link className="btn btn-primary" to="/customer/choose?type=meal">Order food</Link></div> : data.meals.map(m => <article className="history-meal-row" key={m.id}><MenuImage className="meal-thumbnail" menu={m.menu} imageUrl={m.image_url} /><div className="history-meal-info"><strong>{m.menu || "Menu not available"}</strong><p>{m.meal_type} · {m.date} · {m.kind === "meal" ? "Single meal" : "Subscription meal"}</p><p>{m.status}</p>{m.rating && <span aria-label={`${m.rating} out of 5 stars`}>{"★".repeat(m.rating)}</span>}</div>{m.can_review && <Link to={`/customer/reviews?meal=${m.id}`}>{m.rating ? "View review" : "Rate meal"}</Link>}</article>)}</section>}</main></>;
+}

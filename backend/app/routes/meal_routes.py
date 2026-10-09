@@ -1,0 +1,335 @@
+from datetime import date, datetime, timezone
+from decimal import Decimal
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+
+from app.database import get_db
+from app import models, schemas
+from app.auth import get_current_user
+
+
+router = APIRouter(prefix="/meals", tags=["meals"])
+
+
+def ensure_not_dispatched(db, user_id, meal_id):
+    user = db.get(models.User, user_id)
+    if not user or user.role != "customer":
+        raise HTTPException(403, "Customer access required")
+    meal = db.get(models.Meal, meal_id)
+    if meal and not db.query(models.MealPlan).filter(models.MealPlan.user_id == user_id, models.MealPlan.meal_id.is_(None), models.MealPlan.status == "active", models.MealPlan.start_date <= meal.date, models.MealPlan.end_date >= meal.date).first():
+        raise HTTPException(403, "An active subscription must cover this meal before you can skip it or add guests")
+    delivery = db.query(models.DeliveryUpdate).filter_by(user_id=user_id, meal_id=meal_id).first()
+    if delivery and delivery.status in ("out_for_delivery", "delivered"):
+        raise HTTPException(400, "This meal has been dispatched. Meal changes are closed.")
+
+
+def guest_price(db):
+    setting = db.query(models.GuestPricing).first()
+    return setting.price if setting else Decimal("50.00")
+
+
+@router.get("/guest-price")
+def get_guest_price(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    return {"price": float(guest_price(db))}
+
+
+# =========================================================
+# GET TODAY'S MEALS
+# =========================================================
+
+@router.get("/today", response_model=list[schemas.MealOut])
+def get_todays_meals(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    meals = (
+        db.query(models.Meal)
+        .filter(models.Meal.date == date.today())
+        .order_by(models.Meal.cutoff_time)
+        .all()
+    )
+
+    orders = db.query(models.MealOrder).filter(models.MealOrder.user_id == current_user.id).all()
+    statuses = {order.meal_id: order.status for order in orders}
+    plans = db.query(models.MealPlan).filter_by(user_id=current_user.id, status="active").all()
+    return [schemas.MealOut.model_validate(meal).model_copy(update={
+        "status": statuses.get(meal.id, "confirmed"),
+        "can_manage": any(p.meal_id is None and p.start_date <= meal.date <= p.end_date for p in plans),
+        "booked": any(p.start_date <= meal.date <= p.end_date and (p.meal_id is None or p.meal_id == meal.id) for p in plans),
+    }) for meal in meals]
+
+
+# =========================================================
+# GET UPCOMING MEALS
+# =========================================================
+
+@router.get("/upcoming", response_model=list[schemas.MealOut])
+def get_upcoming_meals(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    meals = (
+        db.query(models.Meal)
+        .filter(models.Meal.date >= date.today())
+        .order_by(models.Meal.date, models.Meal.cutoff_time)
+        .all()
+    )
+
+    orders = db.query(models.MealOrder).filter(models.MealOrder.user_id == current_user.id).all()
+    statuses = {order.meal_id: order.status for order in orders}
+    plans = db.query(models.MealPlan).filter_by(user_id=current_user.id, status="active").all()
+    return [schemas.MealOut.model_validate(meal).model_copy(update={
+        "status": statuses.get(meal.id, "confirmed"),
+        "can_manage": any(p.meal_id is None and p.start_date <= meal.date <= p.end_date for p in plans),
+        "booked": any(p.start_date <= meal.date <= p.end_date and (p.meal_id is None or p.meal_id == meal.id) for p in plans),
+    }) for meal in meals]
+
+
+# =========================================================
+# SKIP MEAL
+# =========================================================
+
+@router.post("/skip")
+def skip_meal(
+    req: schemas.SkipMealRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    ensure_not_dispatched(db, current_user.id, req.meal_id)
+    # Find meal
+    meal = (
+        db.query(models.Meal)
+        .filter(models.Meal.id == req.meal_id)
+        .first()
+    )
+
+    if not meal:
+        raise HTTPException(
+            status_code=404,
+            detail="Meal not found"
+        )
+
+    # Check cutoff time
+    if meal.date < date.today() or (meal.cutoff_time and datetime.now(timezone.utc) >= meal.cutoff_time.replace(tzinfo=timezone.utc)):
+        raise HTTPException(
+            status_code=400,
+            detail="Cutoff time has passed. You cannot skip this meal."
+        )
+
+    # Check existing order/action
+    existing_order = (
+        db.query(models.MealOrder)
+        .filter(
+            models.MealOrder.user_id == current_user.id,
+            models.MealOrder.meal_id == req.meal_id,
+        )
+        .first()
+    )
+
+    # User already skipped
+    if existing_order and existing_order.status == "skipped":
+        raise HTTPException(
+            status_code=400,
+            detail="You have already skipped this meal."
+        )
+
+    # Existing action -> update it instead of creating duplicate
+    if existing_order:
+        existing_order.status = "skipped"
+        existing_order.extra_items = None
+        existing_order.extra_cost = 0
+
+        db.commit()
+        db.refresh(existing_order)
+
+        return {
+            "message": "Meal skipped successfully",
+            "meal_id": req.meal_id,
+            "status": "skipped",
+        }
+
+    # No existing action -> create one
+    order = models.MealOrder(
+        user_id=current_user.id,
+        meal_id=req.meal_id,
+        status="skipped",
+        extra_cost=0,
+    )
+
+    db.add(order)
+    db.commit()
+    db.refresh(order)
+
+    return {
+        "message": "Meal skipped successfully",
+        "meal_id": req.meal_id,
+        "status": "skipped",
+    }
+
+
+# =========================================================
+# UNDO SKIP
+# =========================================================
+
+@router.post("/undo-skip")
+def undo_skip(
+    req: schemas.SkipMealRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    ensure_not_dispatched(db, current_user.id, req.meal_id)
+    meal = (
+        db.query(models.Meal)
+        .filter(models.Meal.id == req.meal_id)
+        .first()
+    )
+
+    if not meal:
+        raise HTTPException(
+            status_code=404,
+            detail="Meal not found"
+        )
+
+    # Cannot undo after cutoff
+    if meal.date < date.today() or (meal.cutoff_time and datetime.now(timezone.utc) >= meal.cutoff_time.replace(tzinfo=timezone.utc)):
+        raise HTTPException(
+            status_code=400,
+            detail="Cutoff time has passed. You cannot undo this skip."
+        )
+
+    order = (
+        db.query(models.MealOrder)
+        .filter(
+            models.MealOrder.user_id == current_user.id,
+            models.MealOrder.meal_id == req.meal_id,
+            models.MealOrder.status == "skipped",
+        )
+        .first()
+    )
+
+    if not order:
+        raise HTTPException(
+            status_code=404,
+            detail="No skipped meal found."
+        )
+
+    order.status = "confirmed"
+
+    db.commit()
+    db.refresh(order)
+
+    return {
+        "message": "Meal skip cancelled successfully",
+        "meal_id": req.meal_id,
+        "status": "confirmed",
+    }
+
+
+# =========================================================
+# ADD GUEST
+# =========================================================
+
+@router.post("/add-guest")
+def add_guest(
+    req: schemas.AddGuestRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    ensure_not_dispatched(db, current_user.id, req.meal_id)
+    # Find the meal
+    meal = (
+        db.query(models.Meal)
+        .filter(models.Meal.id == req.meal_id)
+        .first()
+    )
+
+    if not meal:
+        raise HTTPException(
+            status_code=404,
+            detail="Meal not found"
+        )
+
+    # Check cutoff time
+    if meal.date < date.today() or (meal.cutoff_time and datetime.now(timezone.utc) >= meal.cutoff_time.replace(tzinfo=timezone.utc)):
+        raise HTTPException(
+            status_code=400,
+            detail="Cutoff time has passed, cannot add a guest"
+        )
+
+    # Check whether user already has an action for this meal
+    existing_order = (
+        db.query(models.MealOrder)
+        .filter(
+            models.MealOrder.user_id == current_user.id,
+            models.MealOrder.meal_id == req.meal_id,
+        )
+        .first()
+    )
+
+    # Prevent duplicate guest additions
+    if existing_order and existing_order.status == "guest_added":
+        raise HTTPException(
+            status_code=400,
+            detail="Guest already added for this meal"
+        )
+
+    unit_price = guest_price(db)
+    if req.expected_unit_price is not None and Decimal(str(req.expected_unit_price)) != unit_price:
+        raise HTTPException(409, "Guest price has changed. Refresh the page and confirm the new total.")
+    total = unit_price * req.guest_count
+    items = f"{req.guest_count} guest meal(s) at Rs {unit_price:.2f} each"
+
+    # If another action exists, update the same row
+    if existing_order:
+        existing_order.status = "guest_added"
+        existing_order.extra_items = items
+        existing_order.guest_count = req.guest_count
+        existing_order.extra_cost = total
+
+        db.commit()
+        db.refresh(existing_order)
+
+        return {
+            "message": "Guest added successfully",
+            "meal_id": req.meal_id,
+            "status": "guest_added"
+        }
+
+    # Otherwise create a new order
+    order = models.MealOrder(
+        user_id=current_user.id,
+        meal_id=req.meal_id,
+        status="guest_added",
+        extra_items=items,
+        guest_count=req.guest_count,
+        extra_cost=total,
+    )
+
+    db.add(order)
+    db.commit()
+    db.refresh(order)
+
+    return {
+        "message": "Guest added successfully",
+        "meal_id": req.meal_id,
+        "status": "guest_added"
+    }# =========================================================
+# GET MY MEAL HISTORY
+# =========================================================
+
+@router.get("/history", response_model=list[schemas.MealOrderOut])
+def get_meal_history(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    orders = (
+        db.query(models.MealOrder)
+        .filter(
+            models.MealOrder.user_id == current_user.id
+        )
+        .order_by(models.MealOrder.id.desc())
+        .all()
+    )
+
+    return orders

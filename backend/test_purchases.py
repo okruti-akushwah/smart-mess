@@ -1,0 +1,150 @@
+import test_app
+from datetime import date, datetime, timedelta
+from uuid import uuid4
+from app import models
+
+
+class PurchaseTests(test_app.ApplicationTests):
+    def address(self):
+        r = self.client.put('/delivery/address', headers=self.customer, json={'address': 'Flat 12, Test Road, Pune 411001'})
+        self.assertEqual(r.status_code, 200, r.text)
+
+    def buy(self, **choice):
+        return self.client.post('/customer/checkout', headers=self.customer, json={'purchase_key': str(uuid4()), **choice})
+
+    def pay(self, bill, amount, approve=True):
+        r = self.client.post('/payments/submissions', headers=self.customer, data={'bill_id': bill, 'amount': str(amount), 'method': 'cash'})
+        self.assertEqual(r.status_code, 201, r.text)
+        submission = self.client.get('/payments/submissions', headers=self.customer).json()[0]['id']
+        if approve:
+            r = self.client.patch(f'/owner/payment-submissions/{submission}', headers=self.owner, json={'status': 'approved'})
+            self.assertEqual(r.status_code, 200, r.text)
+        return submission
+
+    def test_address_first_and_subscription_activation_after_full_payment(self):
+        offer = self.offer()
+        body = {'offer_id': offer['id'], 'start_date': date.today().isoformat(), 'expected_price': 700}
+        self.assertEqual(self.buy(**body).status_code, 409)
+        self.address()
+        r = self.buy(**body)
+        self.assertEqual(r.status_code, 201, r.text)
+        bill = r.json()['id']
+        self.assertEqual(self.client.get('/subscriptions/current', headers=self.customer).json(), [])
+        s = self.pay(bill, 200, approve=False)
+        self.assertEqual(self.client.get('/customer/activity', headers=self.customer).json()['purchases'][0]['amount_paid'], 0)
+        self.assertEqual(self.client.patch(f'/owner/payment-submissions/{s}', headers=self.owner, json={'status':'approved'}).status_code, 200)
+        self.assertEqual(self.client.get('/subscriptions/current', headers=self.customer).json(), [])
+        self.pay(bill, 500)
+        current = self.client.get('/subscriptions/current', headers=self.customer).json()
+        self.assertEqual(len(current), 1)
+        activity = self.client.get('/customer/activity', headers=self.customer).json()
+        self.assertEqual(activity['purchases'][0]['amount_paid'], 700)
+        self.assertEqual(len(activity['receipts']), 2)
+        self.assertEqual(self.buy(**body).status_code, 409)
+
+    def test_single_meal_books_only_selected_meal_and_reviews_next_day(self):
+        self.address()
+        lunch = self.meal(single_price=120)
+        dinner = self.meal(meal_type='dinner', single_price=150)
+        r = self.buy(meal_id=lunch['id'], expected_price=120)
+        self.assertEqual(r.status_code, 201, r.text)
+        self.assertEqual(self.client.get('/dashboard/headcount', headers=self.owner).json()['meals'][0]['expected_headcount'], 0)
+        self.pay(r.json()['id'], 120)
+        counts = self.client.get('/dashboard/headcount', headers=self.owner).json()['meals']
+        self.assertEqual(next(m for m in counts if m['meal_id'] == lunch['id'])['expected_headcount'], 1)
+        self.assertEqual(next(m for m in counts if m['meal_id'] == dinner['id'])['expected_headcount'], 0)
+        self.assertEqual(self.client.get('/subscriptions/current', headers=self.customer).json(), [])
+        self.assertEqual(self.client.post('/meals/skip', headers=self.customer, json={'meal_id': lunch['id']}).status_code, 403)
+        self.assertEqual(self.client.get('/reviews/eligible', headers=self.customer).json(), [])
+        with self.Session() as db:
+            meal = db.get(models.Meal, lunch['id'])
+            meal.date = date.today() - timedelta(days=1)
+            p = db.query(models.MealPlan).one()
+            p.start_date = p.end_date = meal.date
+            db.add(models.DeliveryUpdate(owner_id=self.owner_id, user_id=self.customer_id, meal_id=meal.id, status='delivered', updated_at=datetime.utcnow()-timedelta(days=1)))
+            db.commit()
+        eligible = self.client.get('/reviews/eligible', headers=self.customer).json()
+        self.assertEqual([m['id'] for m in eligible], [lunch['id']])
+        r = self.client.post('/reviews', headers=self.customer, json={'meal_id': lunch['id'], 'rating': 4, 'comment': 'Please add more salad'})
+        self.assertEqual(r.status_code, 200, r.text)
+        feedback = self.client.get('/owner/reviews', headers=self.owner).json()[0]
+        self.assertEqual(feedback['rating'], 4)
+        self.assertEqual(feedback['comment'], 'Please add more salad')
+        self.assertEqual(self.client.get('/customer/activity', headers=self.customer).json()['meals'][0]['rating'], 4)
+
+    def test_checkout_retry_cancel_price_and_ownership(self):
+        self.address()
+        meal = self.meal(single_price=100)
+        key = str(uuid4())
+        body = {'meal_id':meal['id'], 'expected_price':100, 'purchase_key':key}
+        r = self.client.post('/customer/checkout', headers=self.customer, json=body)
+        self.assertEqual(r.status_code, 201, r.text)
+        self.assertEqual(self.client.post('/customer/checkout', headers=self.customer, json=body).json()['id'], r.json()['id'])
+        other, _ = self.account('9876543212', 'customer')
+        self.assertEqual(self.client.get('/customer/activity', headers=other).json()['purchases'], [])
+        self.assertEqual(self.client.delete(f"/customer/checkout/{r.json()['plan_id']}", headers=other).status_code,404)
+        self.assertEqual(self.client.delete(f"/customer/checkout/{r.json()['plan_id']}", headers=self.customer).status_code,200)
+        self.assertEqual(self.client.post('/payments/submissions', headers=self.customer, data={'bill_id':r.json()['id'], 'amount':100, 'method':'cash'}).status_code,409)
+        self.assertEqual(self.buy(meal_id=meal['id'], expected_price=99).status_code,409)
+        self.assertEqual(self.buy(meal_id=meal['id'], expected_price=100).status_code,201)
+
+    def test_unpaid_and_undelivered_meals_not_reviewable(self):
+        self.address()
+        meal = self.meal(single_price=100)
+        r = self.buy(meal_id=meal['id'], expected_price=100)
+        with self.Session() as db:
+            m = db.get(models.Meal, meal['id']); m.date = date.today()-timedelta(days=1)
+            p = db.query(models.MealPlan).one(); p.start_date = p.end_date = m.date
+            db.commit()
+        self.assertEqual(self.client.get('/reviews/eligible', headers=self.customer).json(), [])
+        self.pay(r.json()['id'], 100)
+        with self.Session() as db:
+            db.add(models.DeliveryUpdate(owner_id=self.owner_id, user_id=self.customer_id, meal_id=meal['id'], status='preparing')); db.commit()
+        self.assertEqual(self.client.get('/reviews/eligible', headers=self.customer).json(), [])
+
+    def test_single_price_required_and_booked_meal_cannot_move_or_delete(self):
+        self.address()
+        meal = self.meal()
+        self.assertEqual(self.buy(meal_id=meal['id'], expected_price=100).status_code,409)
+        self.assertEqual(self.client.put(f"/owner/meals/{meal['id']}", headers=self.owner, json={'single_price':-2}).status_code,422)
+        self.client.put(f"/owner/meals/{meal['id']}", headers=self.owner, json={'single_price':100})
+        r = self.buy(meal_id=meal['id'], expected_price=100)
+        self.assertEqual(r.status_code,201,r.text)
+        self.assertEqual(self.client.delete(f"/owner/meals/{meal['id']}", headers=self.owner).status_code,400)
+        self.assertEqual(self.client.put(f"/owner/meals/{meal['id']}", headers=self.owner, json={'date':(date.today()+timedelta(days=2)).isoformat()}).status_code,409)
+
+    def test_owner_can_record_future_checkout_cash_and_other_messes_cannot_access(self):
+        self.address()
+        offer = self.offer()
+        r = self.buy(offer_id=offer['id'], start_date=(date.today()+timedelta(days=2)).isoformat(), expected_price=700)
+        self.assertEqual(r.status_code,201,r.text)
+        account = self.client.get('/owner/payments', headers=self.owner).json()[0]
+        self.assertEqual(account['name'], 'Customer')
+        self.assertTrue(account['bill_generated'])
+        other_owner, other_id = self.account('9876543213', 'owner')
+        foreign_meal = self.client.post('/owner/meals', headers=other_owner, json={'date':(date.today()+timedelta(days=1)).isoformat(), 'meal_type':'lunch', 'single_price':100}).json()
+        self.assertEqual(self.buy(meal_id=foreign_meal['id'], expected_price=100).status_code,404)
+        self.assertEqual(self.client.get('/owner/payments', headers=other_owner).json(),[])
+        self.assertEqual(self.client.get('/owner/reviews', headers=other_owner).json(),[])
+        body = {'plan_id':r.json()['plan_id'], 'amount':700, 'receipt_key':str(uuid4()), 'reference':'Cash at counter'}
+        self.assertEqual(self.client.post('/owner/payments', headers=other_owner, json=body).status_code,400)
+        response = self.client.post('/owner/payments', headers=self.owner, json=body)
+        self.assertEqual(response.status_code,201,response.text)
+        self.assertEqual(len(self.client.get('/subscriptions/current', headers=self.customer).json()),1)
+        self.assertEqual(self.client.get('/customer/activity', headers=self.customer).json()['purchases'][0]['status'],'active')
+
+    def test_checkout_migration_is_idempotent_and_preserves_legacy_data(self):
+        from sqlalchemy import create_engine, text, inspect
+        from app.migrations import add_customer_checkout
+        engine = create_engine('sqlite://')
+        with engine.begin() as connection:
+            connection.execute(text('CREATE TABLE meals (id INTEGER PRIMARY KEY, menu_description VARCHAR)'))
+            connection.execute(text('CREATE TABLE meal_plans (id INTEGER PRIMARY KEY, price NUMERIC(10,2))'))
+            connection.execute(text("INSERT INTO meals VALUES (1, 'Dal and roti')"))
+            connection.execute(text('INSERT INTO meal_plans VALUES (1, 700)'))
+        add_customer_checkout(engine)
+        add_customer_checkout(engine)
+        with engine.connect() as connection:
+            self.assertEqual(connection.execute(text('SELECT menu_description, single_price FROM meals')).one(),('Dal and roti',None))
+            self.assertEqual(connection.execute(text('SELECT price, meal_id, purchase_key FROM meal_plans')).one(),(700,None,None))
+        engine.dispose()

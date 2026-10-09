@@ -1,0 +1,38 @@
+test_meal_actions_require_customer_subscription (test_action_audit.ActionAuditTests.test_meal_actions_require_customer_subscription) ... ok
+test_generated_bill_changes_and_duplicate_issue (test_action_audit.ActionAuditTests.test_generated_bill_changes_and_duplicate_issue) ... ok
+test_delivery_serving_time_and_guest_migration (test_action_audit.ActionAuditTests.test_delivery_serving_time_and_guest_migration) ... ok
+test_auth_validation_and_permissions (test_app.ApplicationTests.test_auth_validation_and_permissions) ... ok
+test_catalogue_request_approval_and_permissions (test_app.ApplicationTests.test_catalogue_request_approval_and_permissions) ... ok
+test_pause_respects_cutoffs_guests_billing_and_headcount (test_app.ApplicationTests.test_pause_respects_cutoffs_guests_billing_and_headcount) ... ok
+test_reviews_only_eligible_past_meals_and_public_privacy (test_app.ApplicationTests.test_reviews_only_eligible_past_meals_and_public_privacy) ... ok
+test_public_menu_only_upcoming_and_bill_full_subscription (test_app.ApplicationTests.test_public_menu_only_upcoming_and_bill_full_subscription) ... ok
+test_delivery_permissions_privacy_and_dispatched_meal_lock (test_app.ApplicationTests.test_delivery_permissions_privacy_and_dispatched_meal_lock) ... ok
+test_direct_payment_receipts_balances_and_duplicate_protection (test_app.ApplicationTests.test_direct_payment_receipts_balances_and_duplicate_protection) ... ok
+test_legacy_plan_migration_preserves_existing_rows (test_app.ApplicationTests.test_legacy_plan_migration_preserves_existing_rows) ... ok
+test_payment_qr_upload_permissions_validation_and_replacement (test_app.ApplicationTests.test_payment_qr_upload_permissions_validation_and_replacement) ... ok
+test_meal_edit_cutoff_null_and_duplicate (test_app.ApplicationTests.test_meal_edit_cutoff_null_and_duplicate) ... ok
+test_customer_actions_history_billing_and_headcount (test_app.ApplicationTests.test_customer_actions_history_billing_and_headcount) ... ok
+test_cutoff_and_negative_extras (test_app.ApplicationTests.test_cutoff_and_negative_extras) ... ok
+test_generated_menu_photo_persistence_cache_and_permissions (test_app.ApplicationTests.test_generated_menu_photo_persistence_cache_and_permissions) ... ok
+test_image_configuration_error (test_app.ApplicationTests.test_image_configuration_error) ... ok
+test_cloudflare_http_request_and_image_response (test_app.ApplicationTests.test_cloudflare_http_request_and_image_response) ... ok
+test_subscription_validation (test_app.ApplicationTests.test_subscription_validation) ... ok
+test_cloudflare_errors_without_exposing_key (test_app.ApplicationTests.test_cloudflare_errors_without_exposing_key) ... ok
+test_missing_settings_does_not_send (test_credential_email.CredentialEmailTests.test_missing_settings_does_not_send) ... ok
+test_send_and_failure (test_credential_email.CredentialEmailTests.test_send_and_failure) ... ok
+test_homepage_uses_configured_mess_not_seeded_owner (test_enhancements.EnhancementTests.test_homepage_uses_configured_mess_not_seeded_owner) ... ok
+test_timings_saved_validated_and_preserved (test_enhancements.EnhancementTests.test_timings_saved_validated_and_preserved) ... ok
+test_menu_choices_learn_and_persist_without_duplicates (test_enhancements.EnhancementTests.test_menu_choices_learn_and_persist_without_duplicates) ... ok
+test_fixed_guest_price_count_bill_and_headcount (test_guest_price.GuestPriceTests.test_fixed_guest_price_count_bill_and_headcount) ... ok
+test_menu_saves_when_image_provider_unavailable (test_image_reliability.ImageReliabilityTests.test_menu_saves_when_image_provider_unavailable) ... ok
+test_join_approval_and_access (test_join.JoinTests.test_join_approval_and_access) ... ok
+test_upload_save_and_validation (test_menu_upload.MenuUploadTests.test_upload_save_and_validation) ... ok
+test_preview_is_read_only_and_pause_updates_bill_once (test_pause_feedback.PauseFeedbackTests.test_preview_is_read_only_and_pause_updates_bill_once) ... ok
+test_no_menus_and_outside_plan_explain_no_changes (test_pause_feedback.PauseFeedbackTests.test_no_menus_and_outside_plan_explain_no_changes) ... ok
+test_public_details_menu_and_join_destination (test_public_profile.PublicProfileTests.test_public_details_menu_and_join_destination) ... ok
+test_complete_owner_customer_payment_workflow (test_workflow.WorkflowTests.test_complete_owner_customer_payment_workflow) ... ok
+
+----------------------------------------------------------------------
+Ran 33 tests in 65.001s
+
+OK

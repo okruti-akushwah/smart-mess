@@ -1,0 +1,12 @@
+.runtime/
+.venv/
+venv/
+node_modules/
+dist/
+__pycache__/
+*.db
+.env
+backend/generated_menu_images/
+backend/payment_images/
+backend/payment_proofs/
+frontend/.npm-cache/
