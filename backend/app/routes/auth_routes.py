@@ -158,6 +158,11 @@ class SignupOtpCheck(BaseModel):
     challenge_id: str = Field(min_length=20, max_length=64)
     code: str = Field(pattern=r"^[0-9]{6}$")
 
+@router.get("/signup/settings")
+def signup_settings():
+    demo = signup_otp.mode() == "off"
+    return {"demo_registration": demo, "otp_required": not demo}
+
 @router.post("/signup/otp")
 def send_signup_otp(body: SignupOtpRequest, db: Session = Depends(get_db)):
     if body.join_token:

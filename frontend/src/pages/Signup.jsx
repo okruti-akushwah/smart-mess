@@ -1,3 +1,4 @@
+import useSignupSettings from "../services/useSignupSettings";
 import SignupOtp from "../components/SignupOtp";
 import { useTranslation } from "../i18n/useTranslation";
 import { useState } from "react";
@@ -9,15 +10,17 @@ export default function Signup() {
   const navigate = useNavigate();
   const [form, setForm] = useState({ name: "", mess_name: "", phone: "", password: "" });
   const [verification, setVerification] = useState(null);
-  const phoneVerified = verification?.phone === form.phone;
+  const { settings, settingsError } = useSignupSettings();
+  const demo = settings?.demo_registration === true;
+  const phoneReady = /^[0-9]{10}$/.test(form.phone) && (demo || verification?.phone === form.phone);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const submit = async event => {
     event.preventDefault();
-    if (!phoneVerified) { setError("Verify your mobile number first."); return; }
+    if (!phoneReady) { setError("Verify your mobile number first."); return; }
     setLoading(true);setError("");
     try {
-      await api.post("/auth/signup", { ...form, role: "owner", verification_id: verification.id });
+      await api.post("/auth/signup", { ...form, role: "owner", verification_id: demo ? null : verification.id });
       navigate("/owner/login", { replace: true, state: { message: "Mess created. Log in with your phone and password." } });
     } catch (err) {
       setError(errorMessage(err, "Unable to set up mess."));
@@ -35,13 +38,14 @@ export default function Signup() {
     <section className="auth-form-side"><div className="auth-card">
       <p className="eyebrow">{translate("OWNER REGISTRATION")}</p>
         <h2>{translate("Set up your mess")}</h2>
-        <p>{translate("Verify your mobile number first, then add your mess and account details.")}</p>
-        <div className="signup-steps"><strong>{translate("1. Verify mobile")}</strong><span>{translate("2. Account details")}</span></div>
+        <p>{translate(demo ? "Create your demo owner account. SMS verification is disabled; your mobile number remains unverified." : "Verify your mobile number first, then add your mess and account details.")}</p>
+        {!demo && <div className="signup-steps"><strong>{translate("1. Verify mobile")}</strong><span>{translate("2. Account details")}</span></div>}
+        {settingsError && <p className="alert error" role="alert">{translate(settingsError)}</p>}
         <form onSubmit={submit}>
           <label htmlFor="owner-phone">{translate("Phone number / login ID")}</label>
           <input id="owner-phone" name="phone" type="tel" inputMode="numeric" autoComplete="tel-national" pattern="[0-9]{10}" maxLength={10} value={form.phone} onChange={event => {setForm({ ...form, phone: event.target.value.replace(/[^0-9]/g, "") });setVerification(null);setError("");}} required disabled={loading} />
-          {phoneVerified ? <p className="phone-verified" role="status">✓ {translate("Mobile number verified")}</p> : /^[0-9]{10}$/.test(form.phone) ? <SignupOtp key={form.phone} phone={form.phone} inline autoSend onVerified={async id => setVerification({ id, phone: form.phone })} /> : <p className="phone-hint">{translate("Enter 10 digits. We’ll request your OTP automatically.")}</p>}
-          {phoneVerified && <>
+          {phoneReady ? <p className="phone-verified" role="status">{translate(demo ? "Demo registration · Mobile number unverified" : "✓ Mobile number verified")}</p> : settings && /^[0-9]{10}$/.test(form.phone) ? <SignupOtp key={form.phone} phone={form.phone} inline autoSend onVerified={async id => setVerification({ id, phone: form.phone })} /> : <p className="phone-hint">{translate(!settings ? "Loading registration settings…" : demo ? "Enter your 10-digit mobile number. No SMS is sent in demo mode." : "Enter 10 digits. We’ll request your OTP automatically.")}</p>}
+          {phoneReady && <>
           <label htmlFor="owner-name">{translate("Your name")}</label>
           <input id="owner-name" name="name" value={form.name} onChange={change} required maxLength={100} />
           <label htmlFor="mess-name">{translate("Mess name")}</label>

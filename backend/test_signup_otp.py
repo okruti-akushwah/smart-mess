@@ -30,6 +30,24 @@ class SignupOtpTests(ApplicationTests):
         self.assertIn('access_token',r.json());self.assertNotIn('otp_required',r.json())
         self.assertEqual(self.client.post('/auth/token',data={"username":"9876543210","password":"test1234"}).status_code,200)
 
+    def test_production_demo_signup_keeps_customer_approval(self):
+        with patch.dict(os.environ, {"SIGNUP_OTP_MODE": "off", "APP_ENV": "production"}):
+            settings = self.client.get('/auth/signup/settings')
+            self.assertEqual(settings.json(), {"demo_registration": True, "otp_required": False})
+            token = self.client.get('/owner/join-link', headers=self.owner).json()['token']
+            body = {"name": "Demo customer", "phone": "9999999999", "password": "test1234"}
+            with patch('app.signup_otp.provider_request') as sms:
+                response = self.client.post('/join/' + token, json=body)
+                self.assertEqual(response.status_code, 201, response.text)
+                sms.assert_not_called()
+            login = self.client.post('/auth/login', json={"phone": body['phone'], "password": body['password']})
+            headers = {"Authorization": "Bearer " + login.json()['access_token']}
+            self.assertEqual(self.client.get('/join-status', headers=headers).json()['status'], 'pending')
+            self.assertEqual(self.client.get('/customer/activity', headers=headers).status_code, 403)
+            owner = {"name": "Demo owner", "mess_name": "Demo Kitchen", "phone": "9999999998", "password": "test1234", "role": "owner"}
+            self.assertEqual(self.client.post('/auth/signup', json=owner).status_code, 200)
+        self.assertEqual(self.client.get('/auth/signup/settings').json(), {"demo_registration": False, "otp_required": True})
+
     def test_owner_signup_requires_verified_phone(self):
         with self.Session() as db: db.query(models.User).delete();db.commit()
         body={"name":"Owner","mess_name":"Test Mess","phone":"9999999999","password":"1234","role":"owner"}
