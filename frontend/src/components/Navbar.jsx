@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import api from "../services/api";
 import { useTranslation } from "../i18n/useTranslation";
 import BillNotification from "./BillNotification";
 import { Link, useNavigate, useLocation } from "react-router-dom";
@@ -8,6 +10,16 @@ function Navbar({ title = "Dashboard" }) {
   const location = useLocation();
 
   const role = localStorage.getItem("role");
+
+  const [messName, setMessName] = useState("");
+  useEffect(() => {
+    if (role !== "customer") return;
+    let active = true;
+    api.get("/customer/account").then(({ data }) => {
+      if (active) setMessName(data.mess_name);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [role]);
 
   const logout = () => {
     localStorage.removeItem("token");
@@ -26,7 +38,7 @@ function Navbar({ title = "Dashboard" }) {
         <div className="brand-icon">{translate("M")}</div>
 
         <div>
-          <h2>{translate("Smart Mess")}</h2>
+          <h2>{messName || translate("Smart Mess")}</h2>
           <span>{translate("Fresh meals. Less waste.")}</span>
         </div>
       </Link>
@@ -38,6 +50,7 @@ function Navbar({ title = "Dashboard" }) {
           ["/owner/plans", "Plans & subscriptions"], ["/owner/payments", "Payments"],
           ["/owner/bills", "Bills"], ["/owner/delivery", "Deliveries"], ["/owner/settings", "Settings"],
         ].map(([path, label]) => <Link key={path} to={path} aria-current={location.pathname === path ? "page" : undefined}>{translate(label)}</Link>) : [
+          ["/customer", "Dashboard"],
           ["/customer/choose?type=meal", "Order food"],
           ["/customer/plans", "Subscriptions"],
           ["/customer/pause", "Pause meals"],

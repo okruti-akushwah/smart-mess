@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.menu_images import IMAGE_DIR
 from app.payment_uploads import PAYMENT_IMAGE_DIR
-from app.migrations import add_menu_image_column, add_skip_deduction_column, add_guest_count_column, add_plan_offer_column, add_mess_ownership, add_customer_checkout
+from app.migrations import add_menu_image_column, add_skip_deduction_column, add_guest_count_column, add_plan_offer_column, add_mess_ownership, add_customer_checkout, add_profile_languages, add_subscription_extensions
 
 from app.database import engine, Base
 
@@ -34,6 +34,8 @@ add_skip_deduction_column(engine)
 add_guest_count_column(engine)
 add_plan_offer_column(engine)
 add_customer_checkout(engine)
+add_subscription_extensions(engine)
+add_profile_languages(engine)
 add_mess_ownership(engine)
 from sqlalchemy.orm import Session
 from app.installation import initialize

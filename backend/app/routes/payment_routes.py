@@ -48,8 +48,8 @@ def download_receipt(receipt_id: int, db: Session = Depends(get_db), user=Depend
 
 def settings_output(item):
     return {"payee_name": item.payee_name or "" if item else "", "upi_id": item.upi_id or "" if item else "",
-            "instructions": item.instructions or "" if item else "Pay cash directly to your mess owner.",
-            "qr_url": item.qr_url if item else None, "cash_available": True}
+            "instructions": item.instructions or "" if item else "",
+            "qr_url": item.qr_url if item else None, "cash_available": False}
 
 
 @router.get("/payments/methods")
@@ -123,7 +123,7 @@ def remove_qr(db: Session = Depends(get_db), owner=Depends(require_owner)):
         path = PAYMENT_IMAGE_DIR / old_url.rsplit("/", 1)[-1]
         if path.parent == PAYMENT_IMAGE_DIR:
             path.unlink(missing_ok=True)
-    return {"message": "QR removed. Customers can still pay cash.", **settings_output(item)}
+    return {"message": "QR removed. Upload a QR to enable customer payment.", **settings_output(item)}
 
 
 @router.get("/owner/payments")

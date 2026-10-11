@@ -18,7 +18,7 @@ class WorkflowTests(test_app.ApplicationTests):
         self.assertEqual(self.client.post('/meals/skip', headers=new_user, json={'meal_id':meal['id']}).status_code, 200)
         self.assertEqual(self.client.put('/owner/guest-price', headers=self.owner, json={'price':75}).status_code, 200)
         self.assertEqual(self.client.post('/meals/add-guest', headers=new_user, json={'meal_id':dinner['id'],'extra_cost':75}).status_code, 200)
-        self.assertEqual(self.client.get('/bills/current', headers=new_user).json()['final_amount'],3025)
+        self.assertEqual(self.client.get('/bills/current', headers=new_user).json()['final_amount'],3075)
         self.assertFalse(next(a for a in self.client.get('/owner/payments',headers=self.owner).json() if a['plan_id'] == plan)['bill_generated'])
         issued = self.client.post(f'/owner/bills/{plan}',headers=self.owner)
         self.assertEqual(issued.status_code,201,issued.text)
@@ -39,17 +39,17 @@ class WorkflowTests(test_app.ApplicationTests):
         sub=self.client.get('/payments/submissions',headers=self.owner).json()[0]['id']
         self.assertEqual(self.client.get(f'/payments/submissions/{sub}/image',headers=self.customer).status_code,404)
         self.assertEqual(self.client.get(f'/payments/submissions/{sub}/image',headers=self.owner).content,png)
-        self.assertEqual(self.client.post('/payments/submissions',headers=new_user,data={**body,'method':'cash'}).status_code,409)
+        self.assertEqual(self.client.post('/payments/submissions',headers=new_user,data=body,files={'file':('proof.png',png,'image/png')}).status_code,409)
         self.assertEqual(self.client.get('/bills/current',headers=new_user).json()['amount_paid'],0)
         self.assertEqual(self.client.patch(f'/owner/payment-submissions/{sub}',headers=new_user,json={'status':'approved'}).status_code,403)
         for _ in range(2):
             self.assertEqual(self.client.patch(f'/owner/payment-submissions/{sub}',headers=self.owner,json={'status':'approved'}).status_code,200)
-        self.assertEqual(self.client.get('/bills/current',headers=new_user).json()['balance_due'],2025)
+        self.assertEqual(self.client.get('/bills/current',headers=new_user).json()['balance_due'],2075)
         self.assertEqual(len(self.client.get('/payments/history',headers=new_user).json()),1)
-        self.assertEqual(self.client.post('/payments/submissions',headers=new_user,data={**body,'method':'cash','amount':'2025'}).status_code,201)
+        self.assertEqual(self.client.post('/payments/submissions',headers=new_user,data={**body,'amount':'2075'},files={'file':('proof.png',png,'image/png')}).status_code,201)
         sub2=self.client.get('/payments/submissions',headers=self.owner).json()[0]['id']
         self.assertEqual(self.client.patch(f'/owner/payment-submissions/{sub2}',headers=self.owner,json={'status':'rejected'}).status_code,200)
-        self.assertEqual(self.client.post('/payments/submissions',headers=new_user,data={**body,'method':'cash','amount':'2025'}).status_code,201)
+        self.assertEqual(self.client.post('/payments/submissions',headers=new_user,data={**body,'amount':'2075'},files={'file':('proof.png',png,'image/png')}).status_code,201)
         sub3=self.client.get('/payments/submissions',headers=self.owner).json()[0]['id']
         # Generated bills can still be settled after subscription expiry.
         with self.Session() as db:

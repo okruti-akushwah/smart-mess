@@ -4,7 +4,8 @@ import { useTranslation } from "../i18n/useTranslation";
 import { useCallback, useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import api, { errorMessage } from "../services/api";
-import foodPhoto from "../assets/thali.png";
+import { localDay } from "../services/dates";
+import { pendingBalance } from "../services/billing";
 import MenuImage from "../components/MenuImage";
 
 function closed(meal) {
@@ -17,6 +18,8 @@ export default function CustomerDashboard() {
   const translate = useTranslation();
   const [meals, setMeals] = useState([]);
   const [subscriptions, setSubscriptions] = useState([]);
+  const [account, setAccount] = useState(null);
+  const [balance, setBalance] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState("");
@@ -26,13 +29,23 @@ export default function CustomerDashboard() {
   const [guestPrice, setGuestPrice] = useState(null);
   const load = useCallback(async () => {
     try {
-      const [mealResult, planResult, priceResult] = await Promise.allSettled([api.get("/meals/upcoming"), api.get("/subscriptions/current"), api.get("/meals/guest-price")]);
-      if (priceResult.status === "fulfilled") setGuestPrice(priceResult.value.data.price);else
-      {setGuestPrice(null);throw priceResult.reason;}
-      if (mealResult.status === "rejected") throw mealResult.reason;
-      setMeals(mealResult.value.data);
-      if (planResult.status === "rejected") throw planResult.reason;
-      setSubscriptions(planResult.value.data);
+      const results = await Promise.allSettled([
+        api.get("/meals/upcoming"), api.get("/subscriptions/current"),
+        api.get("/meals/guest-price"), api.get("/customer/account"),
+        api.get("/bills/issued"), api.get("/bills/current"),
+      ]);
+      const [mealResult, planResult, priceResult, accountResult, billsResult, currentResult] = results;
+      if (mealResult.status === "fulfilled") setMeals(mealResult.value.data);
+      if (planResult.status === "fulfilled") setSubscriptions(planResult.value.data);
+      setGuestPrice(priceResult.status === "fulfilled" ? priceResult.value.data.price : null);
+      if (accountResult.status === "fulfilled") setAccount(accountResult.value.data);
+      const noCurrent = currentResult.status === "rejected" && currentResult.reason.response?.status === 404;
+      if (billsResult.status === "fulfilled" && (currentResult.status === "fulfilled" || noCurrent)) {
+        setBalance(pendingBalance(billsResult.value.data, noCurrent ? null : currentResult.value.data));
+      } else setBalance(null);
+      const failed = results.find((result, index) => result.status === "rejected" && !(index === 5 && noCurrent));
+      if (failed) throw failed.reason;
+      setError("");
     } catch (e) {setError(errorMessage(e, "Unable to load your dashboard."));} finally
     {setLoading(false);}
   }, []);
@@ -45,7 +58,7 @@ export default function CustomerDashboard() {
     } catch (e) {setError(errorMessage(e));} finally
     {setBusy(null);}
   }
-  const today = new Date().toLocaleDateString("en-CA");
+  const today = localDay();
   const todayMeals = meals.filter((m) => m.date === today);
   const upcoming = meals.filter((m) => m.date !== today);
   function card(meal) {
@@ -58,15 +71,32 @@ export default function CustomerDashboard() {
       {meal.cutoff_time && <p>{translate("Cutoff: ")}{translate(new Date(/[Z]|[+-]\d\d:\d\d$/.test(meal.cutoff_time) ? meal.cutoff_time : `${meal.cutoff_time}Z`).toLocaleString(translate.locale))}</p>}
       {meal.can_manage ? <div className="meal-actions">
         <button className="btn btn-danger-soft" disabled={isClosed || busy !== null} onClick={() => action(meal, meal.status === "skipped" ? "undo-skip" : "skip")}>{translate(busy === meal.id ? "Saving…" : meal.status === "skipped" ? "Undo skip" : "Skip meal")}</button>
-        <button className="btn btn-outline" disabled={isClosed || busy !== null || guestPrice === null || meal.status === "guest_added"} onClick={() => {setGuest(meal);setGuestCount(1);}}>{translate("+ Guest")}</button>
+        <button className="btn btn-outline" disabled={isClosed || busy !== null || guestPrice === null || meal.status === "guest_added" || meal.status === "skipped"} onClick={() => {setGuest(meal);setGuestCount(1);}}>{translate("+ Guest")}</button>
       </div> : <div className="meal-actions">{meal.booked ? <span className="status-badge">Single meal booked</span> : <Link className="btn btn-primary" to="/customer/choose?type=meal">Order a meal</Link>}</div>}
     </article>;
   }
-  return <><Navbar title={translate("Your meals")} /><main className="dashboard">
+  return <><Navbar title={translate("Dashboard")} /><main className="dashboard">
+    <section className="management-card customer-overview">
+      <p className="eyebrow">YOUR MESS · YOUR ACCOUNT</p>
+      <h1>{account?.mess_name || "Your customer dashboard"}</h1>
+      <p>Welcome{account?.customer_name ? `, ${account.customer_name}` : ""}. Manage your meals, subscription and payments here.</p>
+      {account?.address && <p>{account.address}</p>}
+      {account?.contact && <p>Contact: {account.contact}</p>}
+      <div className="form-actions"><Link className="btn btn-primary" to="/customer/choose?type=meal">Order a meal</Link><Link className="btn btn-outline" to="/customer/plans/browse">Browse plans</Link><Link className="btn btn-outline" to="/customer/pause">Pause meals</Link><Link className="btn btn-outline" to="/customer/bills">Bills & payments</Link></div>
+    </section>
+    {loading ? <div className="loading-card">{translate("Loading today's menu…")}</div> : <section className="today-menu-section"><div className="section-heading"><div><p className="eyebrow">{translate("FRESH FROM THE KITCHEN")}</p><h2>{translate("Today's menu")}</h2></div><button className="btn btn-outline" onClick={load}>{translate("Refresh")}</button></div><div className="meal-grid">{todayMeals.length ? todayMeals.map(card) : <div className="empty-card">{translate("Today's menu hasn't been scheduled yet.")}</div>}</div></section>}
+    <div className="stats-grid" aria-label="Your account summary">
+      <article className="stat-card"><span>Today's booked meals</span><strong>{loading ? "…" : todayMeals.filter(meal => meal.booked && meal.status !== "skipped").length}</strong><p>Skipped meals are excluded</p></article>
+      <article className="stat-card"><span>Approved subscriptions</span><strong>{loading ? "…" : subscriptions.length}</strong><p>Current and upcoming plans</p></article>
+      <article className="stat-card"><span>Extra subscription days</span><strong>{loading ? "…" : subscriptions.reduce((sum, plan) => sum + (plan.skip_count || 0), 0)}</strong><p>One extra day per skipped meal</p></article>
+      <article className="stat-card"><span>Payment balance</span><strong>{balance === null ? "—" : `₹${balance.toFixed(2)}`}</strong><p><Link to="/customer/bills">View bills and payment status</Link></p></article>
+    </div>
+    {!loading && <section className="management-card"><h2>Your subscriptions</h2>{subscriptions.length ? subscriptions.map(plan => <article key={plan.id} className="customer-plan-row"><h3>{plan.name}</h3><p><span className="status-badge">{plan.start_date > today ? "Starts soon" : "Active"}</span> {plan.start_date} to {plan.end_date}</p><p>{plan.skip_count || 0} skipped meals · {plan.skip_count || 0} extra days included in your end date</p></article>) : <p>No active subscription. You can order a single meal or choose a plan.</p>}</section>}
+    {!!account?.paused_dates.length && <section className="management-card"><h2>Saved meal pauses</h2><p>{account.paused_dates.join(" · ")}</p><p>Meals published for these dates will also be skipped. Extra days are added when a covered meal is skipped.</p><Link to="/customer/pause">Manage meal pauses</Link></section>}
     {!loading && !subscriptions.length && <section className="management-card checkout-reminder"><div><p className="eyebrow">YOUR NEXT MEAL</p><h2>Subscribe, or taste food first</h2><p>Choose your food and pay in a few steps.</p></div><div className="form-actions"><Link className="btn btn-primary" to="/customer/plans/browse">Choose a plan</Link><Link className="btn btn-outline" to="/customer/choose?type=meal">Order a single meal</Link><Link to="/customer/bills">Bills & payments</Link></div></section>}
     <LatestMealReview />
-    {loading ? <div className="loading-card">{translate("Loading today's menu…")}</div> : <section className="today-menu-section"><div className="section-heading"><div><p className="eyebrow">{translate("FRESH FROM THE KITCHEN")}</p><h2>{translate("Today's menu")}</h2></div><button className="btn btn-outline" onClick={load}>{translate("Refresh")}</button></div><div className="meal-grid">{todayMeals.length ? todayMeals.map(card) : <div className="empty-card">{translate("Today's menu hasn't been scheduled yet.")}</div>}</div></section>}
-    <section className="welcome food-welcome"><div><p className="eyebrow">{translate("A LITTLE PLANNING. A LOT LESS WASTE.")}</p><h1>{translate("Good food.")}<br />{translate("On your schedule.")}</h1><p>{translate("Fresh meals, flexible plans and a bill that adds up. Make your choices before the cutoff.")}</p>{!loading && !subscriptions.length && <span className="status-badge">{translate("No active subscription")}</span>}{subscriptions.map(plan => <span className="status-badge" key={plan.id}>{plan.name} · {translate(plan.start_date > today ? "Approved" : "Active")} · {plan.start_date} {translate("to")} {plan.end_date}</span>)}</div><img src={foodPhoto} alt={translate("Fresh vegetarian thali with dal, roti, rice and paneer")} /></section>
+
+
     {error && <div className="alert error" role="alert">{translate(error)}</div>}{message && <div className="alert success" role="status">{translate(message)}</div>}
     {loading ? <div className="loading-card">{translate("Preparing your dashboard…")}</div> : <>
       <section><div className="section-heading"><div><p className="eyebrow">{translate("PLAN YOUR WEEK")}</p><h2>{translate("Coming up next")}</h2></div><span>{translate(upcoming.length)}{translate(" scheduled meals")}</span></div><div className="meal-grid">{upcoming.length ? upcoming.map(card) : <div className="empty-card">{translate("Your upcoming meals will appear here.")}</div>}</div></section>

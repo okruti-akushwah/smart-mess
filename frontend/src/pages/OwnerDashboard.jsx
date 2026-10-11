@@ -1,3 +1,4 @@
+import PersonalOrders from "../components/PersonalOrders";
 import OwnerMealFeedback from "../components/OwnerMealFeedback";
 import { useTranslation } from "../i18n/useTranslation";
 import PendingRequestsSummary from "../components/PendingRequestsSummary";
@@ -17,7 +18,7 @@ function OwnerDashboard() {
   const [error, setError] = useState("");
 
   const loadDashboard = useCallback(async () => {
-    setLoading(true);
+
     setError("");
 
     try {
@@ -39,7 +40,9 @@ function OwnerDashboard() {
 
   useEffect(() => {
     const timer = setTimeout(() => {loadDashboard();}, 0);
-      return () => clearTimeout(timer);
+    const interval = setInterval(loadDashboard, 5000);
+    window.addEventListener("focus", loadDashboard);
+    return () => { clearTimeout(timer); clearInterval(interval); window.removeEventListener("focus", loadDashboard); };
   }, [loadDashboard]);
 
   useEffect(() => {
@@ -47,23 +50,26 @@ function OwnerDashboard() {
     return () => window.removeEventListener("subscription-updated", loadDashboard);
   }, [loadDashboard]);
 
-  const meals = headcount?.meals || [];
+  const meals = headcount?.preparation || [];
+  const latestMeals = headcount?.latest_meals || [];
+  const today = new Date().toLocaleDateString("en-CA");
+  const todayMeals = meals.filter(meal => meal.date === today);
   const publicPageReady = publicProfile?.address?.trim() && publicProfile?.contact?.trim()
     && (publicProfile?.hours?.trim() || publicProfile?.timings?.length);
 
-  const totalExpected = meals.reduce(
+  const totalExpected = todayMeals.reduce(
     (total, meal) =>
     total + (meal.expected_headcount || 0),
     0
   );
 
-  const totalSkips = meals.reduce(
+  const totalSkips = todayMeals.reduce(
     (total, meal) =>
     total + (meal.skipped_subscribers || 0),
     0
   );
 
-  const totalGuests = meals.reduce(
+  const totalGuests = todayMeals.reduce(
     (total, meal) =>
     total + (meal.guests || 0),
     0
@@ -87,7 +93,7 @@ function OwnerDashboard() {
 
             </p>
 
-            <h1>{translate(" Tomorrow's preparation at a glance. ")}
+            <h1>{translate(" Meal preparation at a glance. ")}
 
             </h1>
 
@@ -124,13 +130,13 @@ function OwnerDashboard() {
               <StatCard
               label="Expected Meals"
               value={totalExpected}
-              description="Tomorrow" />
+              description="Today" />
             
 
               <StatCard
               label="Confirmed Skips"
               value={totalSkips}
-              description="Already deducted" />
+              description="Subscription days added" />
             
 
               <StatCard
@@ -147,19 +153,19 @@ function OwnerDashboard() {
 
                 </p>
 
-                  <h2>{translate(" Tomorrow's Meal Plan ")}
+                  <h2>{translate(" Today's and Upcoming Meals ")}
 
                 </h2>
                 </div>
 
                 <span>
-                  {translate(headcount?.date || "")}
+                  {translate("Refreshes every 5 seconds")}
                 </span>
               </div>
 
               <div className="meal-grid">
                 {meals.length === 0 ?
-              <div className="empty-card">{translate(" No meals scheduled for tomorrow. ")}
+              <div className="empty-card">{translate(" No meals scheduled yet. ")}
 
               </div> :
 
@@ -169,9 +175,10 @@ function OwnerDashboard() {
                 key={meal.meal_id}>
                 
                       <span className="meal-type">
-                        {translate(meal.meal_type)}
+                        {translate(meal.meal_type)} · {meal.date}
                       </span>
 
+                      <p>{meal.menu_description}</p><p>{meal.changes_closed ? "Cutoff passed · changes closed" : "Live · changes open"}{meal.cutoff_time ? ` · ${new Date(meal.cutoff_time.endsWith("Z") ? meal.cutoff_time : `${meal.cutoff_time}Z`).toLocaleString()}` : ""}</p>
                       <strong className="big-number">
                         {translate(meal.expected_headcount)}
                       </strong>
@@ -180,9 +187,9 @@ function OwnerDashboard() {
 
                 </span>
 
-                      <div className="headcount-details">
+                      <div className="headcount-details"><div><span>Personal orders</span><strong>{meal.personal_orders}</strong></div>
                         <div>
-                          <span>{translate("Active")}</span>
+                          <span>{translate("Subscriptions")}</span>
                           <strong>
                             {translate(meal.active_subscribers)}
                           </strong>
@@ -211,6 +218,8 @@ function OwnerDashboard() {
 
           </>
         }
+        <PersonalOrders onUpdate={loadDashboard} />
+        <section className="management-card"><h2>Latest completed meal statistics</h2>{latestMeals.length ? latestMeals.map(meal => <div className="request-row" key={meal.meal_id}><div><strong>{meal.date} · {meal.meal_type}</strong><p>{meal.menu_description}</p><p>{meal.expected_headcount} meals · {meal.skipped_subscribers} skips · {meal.guests} guests · {meal.personal_orders} personal orders</p></div></div>) : <p>No completed meals yet.</p>}</section>
         <OwnerMealFeedback />
       </main>
     </>);

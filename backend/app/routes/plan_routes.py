@@ -22,7 +22,7 @@ def assign_plan(req: schemas.PlanCreate, db: Session = Depends(get_db), owner=De
         raise HTTPException(422, "End date must be on or after start date")
     overlap = db.query(models.MealPlan).filter(
         models.MealPlan.user_id == req.user_id,
-        models.MealPlan.status.in_(["active", "pending_payment"]),
+        models.MealPlan.status.in_(["active", "pending_payment", "pending_acceptance"]),
         models.MealPlan.start_date <= req.end_date,
         models.MealPlan.end_date >= req.start_date,
     ).first()

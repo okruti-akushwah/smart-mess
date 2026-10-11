@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Date, ForeignKey, Numeric, Boolean, DateTime
+from sqlalchemy import Column, Integer, String, Date, ForeignKey, Numeric, Boolean, DateTime, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.database import Base
@@ -43,6 +43,10 @@ class MealPlan(Base):
     start_date = Column(Date)
     end_date = Column(Date)
 
+    original_start_date = Column(Date, nullable=True)
+    original_end_date = Column(Date, nullable=True)
+    skip_count = Column(Integer, nullable=False, default=0, server_default="0")
+    accepted = Column(Boolean, nullable=False, default=False, server_default="false")
     status = Column(String, default="active")
 
     user = relationship("User", foreign_keys=[user_id])
@@ -69,6 +73,7 @@ class MealOrder(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
     meal_id = Column(Integer, ForeignKey("meals.id"))
     status = Column(String, default="confirmed")  # "confirmed", "skipped", "guest_added"
+    extension_plan_id = Column(Integer, ForeignKey("meal_plans.id"), nullable=True)
     extra_items = Column(String, nullable=True)
     extra_cost = Column(Numeric(10, 2), default=0)
     guest_count = Column(Integer, nullable=False, default=1)
@@ -213,6 +218,10 @@ class JoinRequest(Base):
 class MessProfile(Base):
     __tablename__ = "mess_profiles"
     owner_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
+    name_hi = Column(String, default="")
+    about_hi = Column(String, default="")
+    preparation_hi = Column(String, default="")
+    address_hi = Column(String, default="")
     name = Column(String, default="")
     address = Column(String, default="")
     contact = Column(String, default="")
@@ -272,3 +281,15 @@ class SignupChallenge(Base):
 class SignupOtpPhone(Base):
     __tablename__ = "signup_otp_phones"
     phone = Column(String(10), primary_key=True)
+
+
+class MealDatePause(Base):
+    __tablename__ = "meal_date_pauses"
+    __table_args__ = (UniqueConstraint("user_id", "date", name="uq_meal_date_pause_user_date"),)
+    id = Column(Integer, primary_key=True)
+    owner_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    plan_id = Column(Integer, ForeignKey("meal_plans.id"), nullable=False)
+    date = Column(Date, nullable=False, index=True)
+    active = Column(Boolean, nullable=False, default=True, server_default="true")
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)

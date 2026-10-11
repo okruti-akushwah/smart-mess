@@ -7,12 +7,14 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app import models, schemas
 from app.auth import get_current_user
+from app.subscription_extensions import lock_customer, change_extension
 
 
 router = APIRouter(prefix="/meals", tags=["meals"])
 
 
 def ensure_not_dispatched(db, user_id, meal_id):
+    lock_customer(db, user_id)
     user = db.get(models.User, user_id)
     if not user or user.role != "customer":
         raise HTTPException(403, "Customer access required")
@@ -134,38 +136,20 @@ def skip_meal(
             detail="You have already skipped this meal."
         )
 
-    # Existing action -> update it instead of creating duplicate
-    if existing_order:
-        existing_order.status = "skipped"
-        existing_order.extra_items = None
-        existing_order.extra_cost = 0
-
-        db.commit()
-        db.refresh(existing_order)
-
-        return {
-            "message": "Meal skipped successfully",
-            "meal_id": req.meal_id,
-            "status": "skipped",
-        }
-
-    # No existing action -> create one
-    order = models.MealOrder(
-        user_id=current_user.id,
-        meal_id=req.meal_id,
-        status="skipped",
-        extra_cost=0,
-    )
-
+    plan = db.query(models.MealPlan).filter(
+        models.MealPlan.user_id == current_user.id, models.MealPlan.meal_id.is_(None),
+        models.MealPlan.status == "active", models.MealPlan.start_date <= meal.date,
+        models.MealPlan.end_date >= meal.date,
+    ).with_for_update().first()
+    order = existing_order or models.MealOrder(user_id=current_user.id, meal_id=meal.id)
+    order.status, order.extra_items, order.extra_cost = "skipped", None, 0
+    order.extension_plan_id = plan.id
     db.add(order)
+    change_extension(db, plan, 1)
     db.commit()
-    db.refresh(order)
-
-    return {
-        "message": "Meal skipped successfully",
-        "meal_id": req.meal_id,
-        "status": "skipped",
-    }
+    return {"message": "Meal skipped. One day added to your subscription.",
+            "meal_id": meal.id, "status": "skipped", "skip_count": plan.skip_count,
+            "end_date": plan.end_date}
 
 
 # =========================================================
@@ -214,6 +198,10 @@ def undo_skip(
             detail="No skipped meal found."
         )
 
+    if order.extension_plan_id:
+        plan = db.get(models.MealPlan, order.extension_plan_id)
+        change_extension(db, plan, -1)
+        order.extension_plan_id = None
     order.status = "confirmed"
 
     db.commit()
@@ -266,6 +254,9 @@ def add_guest(
         )
         .first()
     )
+
+    if existing_order and existing_order.status == "skipped":
+        raise HTTPException(409, "Undo the skip before adding guests")
 
     # Prevent duplicate guest additions
     if existing_order and existing_order.status == "guest_added":

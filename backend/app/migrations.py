@@ -1,6 +1,23 @@
 from sqlalchemy import inspect, text
 
 
+def add_subscription_extensions(engine):
+    with engine.begin() as connection:
+        for table, name, definition in (
+            ("meal_plans", "original_start_date", "DATE"),
+            ("meal_plans", "original_end_date", "DATE"),
+            ("meal_plans", "skip_count", "INTEGER NOT NULL DEFAULT 0"),
+            ("meal_plans", "accepted", "BOOLEAN NOT NULL DEFAULT FALSE"),
+            ("meal_orders", "extension_plan_id", "INTEGER REFERENCES meal_plans(id)"),
+        ):
+            columns = {c["name"] for c in inspect(connection).get_columns(table)}
+            if name not in columns:
+                connection.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {definition}"))
+        connection.execute(text("UPDATE meal_plans SET original_start_date = start_date WHERE original_start_date IS NULL"))
+        connection.execute(text("UPDATE meal_plans SET original_end_date = end_date WHERE original_end_date IS NULL"))
+        connection.execute(text("UPDATE meal_plans SET accepted = TRUE WHERE meal_id IS NOT NULL AND status = 'active'"))
+
+
 def add_customer_checkout(engine):
     with engine.begin() as connection:
         for table, name, definition in (
@@ -82,3 +99,11 @@ def add_mess_ownership(engine):
                 parent, foreign, key, column = parents[table]
                 expression = f"COALESCE((SELECT {column} FROM {parent} WHERE {parent}.{key} = {table}.{foreign}), :owner)"
             connection.execute(text(f"UPDATE {table} SET owner_id = {expression} WHERE owner_id IS NULL"), {"owner": owner})
+
+
+def add_profile_languages(engine):
+    with engine.begin() as connection:
+        columns = {column["name"] for column in inspect(connection).get_columns("mess_profiles")}
+        for field in ("name_hi", "about_hi", "preparation_hi", "address_hi"):
+            if field not in columns:
+                connection.execute(text(f"ALTER TABLE mess_profiles ADD COLUMN {field} VARCHAR DEFAULT ''"))

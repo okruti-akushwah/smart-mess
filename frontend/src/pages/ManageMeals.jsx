@@ -61,6 +61,12 @@ function ManageMeals() {
     return () => clearTimeout(timer);
   }, [loadMeals]);
 
+  useEffect(() => {
+    if (!message) return;
+    const timer = setTimeout(() => setMessage(""), 4000);
+    return () => clearTimeout(timer);
+  }, [message]);
+
   const handleChange = (event) => {
     const { name, value, type, checked } =
     event.target;
@@ -90,7 +96,7 @@ function ManageMeals() {
       cutoff_time:
       form.cutoff_time ?
       new Date(
-        form.cutoff_time
+        `${form.date}T${form.cutoff_time}`
       ).toISOString() :
       null
     };
@@ -167,7 +173,7 @@ function ManageMeals() {
 
       cutoff = localDate.
       toISOString().
-      slice(0, 16);
+      slice(11, 16);
     }
 
     setForm({
@@ -314,19 +320,20 @@ function ManageMeals() {
             <MenuItemPicker key={editingId ?? `new-${meals.length}`} value={form.menu_description} onChange={(value) => handleChange({ target: { name: 'menu_description', value } })} />
 
             <div className="form-field">
-              <label>{translate(" Skip Cutoff Time ")}
+              <label>{translate(" Meal Cutoff Time ")}
 
               </label>
 
               <input
-                type="datetime-local"
+                type="time"
                 name="cutoff_time"
                 value={form.cutoff_time}
-                onChange={handleChange} />
+                onChange={handleChange} required />
+              <small>Uses the meal date selected above. Skips, guests and single-meal orders close at this time.</small>
               
             </div>
 
-            <label className="form-field">Single-meal price (₹)<input type="number" name="single_price" min="0.01" max="10000" step="0.01" value={form.single_price} onChange={handleChange} placeholder="e.g. 120" /><small>Leave blank to disable single-meal ordering. This price is separate from subscription skip deductions.</small></label>
+            <label className="form-field">Single-meal price (₹)<input type="number" name="single_price" min="0.01" max="10000" step="0.01" value={form.single_price} onChange={handleChange} placeholder="e.g. 120" /><small>Leave blank to disable single-meal ordering. Customers without a subscription can buy this meal at this price.</small></label>
             <MenuPhotoEditor menu={form.menu_description} imageUrl={form.image_url} onImage={acceptImage} onBusy={setGenerating} />
             <div className="form-actions">
 

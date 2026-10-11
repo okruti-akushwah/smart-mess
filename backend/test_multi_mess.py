@@ -117,7 +117,7 @@ class MultiMessTests(ApplicationTests):
         bill = self.client.post('/owner/bills/' + str(plan_id), headers=other)
         self.assertEqual(bill.status_code, 201, bill.text)
         submission = self.client.post('/payments/submissions', headers=customer, data={
-            'bill_id': bill.json()['id'], 'amount': 100, 'method': 'cash'})
+            'bill_id': bill.json()['id'], 'amount': 100, 'method': 'upi'}, files={'file':('proof.png', b'\x89PNG\r\n\x1a\n' + b'0'*40 + b'IEND\xaeB`\x82', 'image/png')})
         self.assertEqual(submission.status_code, 201, submission.text)
         row = self.client.get('/payments/submissions', headers=other).json()[0]
         self.assertEqual(self.client.get('/payments/submissions', headers=self.owner).json(), [])

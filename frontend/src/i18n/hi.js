@@ -1,4 +1,14 @@
 export const dictionary = {
+  "Mess name (English)": "मेस का नाम (अंग्रेज़ी)",
+  "Mess name (Hindi, optional)": "मेस का नाम (हिन्दी, वैकल्पिक)",
+  "Full address (English)": "पूरा पता (अंग्रेज़ी)",
+  "Full address (Hindi, optional)": "पूरा पता (हिन्दी, वैकल्पिक)",
+  "About your mess (English)": "आपकी मेस के बारे में (अंग्रेज़ी)",
+  "About your mess (Hindi, optional)": "आपकी मेस के बारे में (हिन्दी, वैकल्पिक)",
+  "How you prepare meals (English)": "आप खाना कैसे तैयार करते हैं (अंग्रेज़ी)",
+  "How you prepare meals (Hindi, optional)": "आप खाना कैसे तैयार करते हैं (हिन्दी, वैकल्पिक)",
+  "Add Hindi text for Hindi visitors. Empty Hindi fields use your existing English text. Text is not translated automatically.": "हिन्दी में देखने वालों के लिए हिन्दी पाठ जोड़ें। हिन्दी के खाली फ़ील्ड में मौजूदा अंग्रेज़ी पाठ दिखेगा। पाठ का अनुवाद अपने आप नहीं होता।",
+
 "Smart Mess":"स्मार्ट मेस",
 "SMART MESS":"स्मार्ट मेस",
 "Fresh meals. Less waste.":"ताज़ा खाना। कम बर्बादी।",

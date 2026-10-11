@@ -30,3 +30,21 @@ class PublicProfileTests(test_app.ApplicationTests):
         self.assertEqual(self.client.post(f'/join/{token}',json={'name':'Public Visitor','phone':'9876543255','password':'chosen123','offer_id':offer['id'],'start_date':date.today().isoformat()}).status_code,201)
         self.assertEqual(len(self.client.get('/owner/join-requests',headers=self.owner).json()),1)
         self.assertEqual(self.client.put('/owner/mess-profile',headers=self.owner,json={**payload,'address':'x'*501}).status_code,422)
+
+    def test_bilingual_profile_saved_and_legacy_update_preserves_hindi(self):
+        payload = {'name': 'Maa Annapurna Mess', 'name_hi': 'माँ अन्नपूर्णा मेस',
+                   'about': 'Fresh homemade meals.', 'about_hi': 'ताज़ा घर का खाना।',
+                   'address_hi': 'जयपुर', 'preparation_hi': 'स्वच्छ रसोई में तैयार भोजन।'}
+        saved = self.client.put('/owner/mess-profile', headers=self.owner, json=payload)
+        self.assertEqual(saved.status_code, 200, saved.text)
+        token = saved.json()['join_token']
+        public = self.client.get('/public/mess/' + token).json()
+        for field, value in payload.items():
+            self.assertEqual(public[field], value)
+        directory = self.client.get('/public/messes').json()
+        self.assertTrue(any(row['name_hi'] == payload['name_hi'] for row in directory))
+        updated = self.client.put('/owner/mess-profile', headers=self.owner, json={'name': 'Updated Kitchen'})
+        self.assertEqual(updated.json()['name_hi'], payload['name_hi'])
+        self.assertEqual(updated.json()['about_hi'], payload['about_hi'])
+        cleared = self.client.put('/owner/mess-profile', headers=self.owner, json={'name': 'Updated Kitchen', 'about_hi': ''})
+        self.assertEqual(cleared.json()['about_hi'], '')

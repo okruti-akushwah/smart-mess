@@ -105,7 +105,7 @@ function BillHistory() {
 
           </div> :
 
-          <div className="bill-summary">
+          <div className="bill-summary"><p>{currentBill.extension_days || 0} extra subscription days · {currentBill.skipped_meals || 0} skipped meals · Subscription ends {currentBill.end_date}</p>
               <BillStat
               label="Base Plan"
               value={
@@ -114,7 +114,7 @@ function BillHistory() {
             
 
               <BillStat
-              label="Skip Deductions"
+              label="Historical Skip Deductions"
               value={
               currentBill.deductions
               }

@@ -10,6 +10,7 @@ from app import models
 from app.database import get_db
 from app.routes.discovery_routes import customer
 from app.routes.workflow_routes import bill_output
+from app.routes.owner_meal_routes import require_owner
 
 router = APIRouter(tags=["customer purchases"])
 
@@ -73,11 +74,11 @@ def checkout(body: CheckoutInput, db: Session = Depends(get_db), user=Depends(cu
         if not meal.single_price:
             raise HTTPException(409, "Your owner has not enabled single-meal ordering for this meal")
         start = end = meal.date
-        price, deduction, name = meal.single_price, Decimal("0"), f"{meal.meal_type.title()} · {meal.menu_description}"
+        price, deduction, name = meal.single_price, Decimal("0"), f"{meal.meal_type.title()} Â· {meal.menu_description}"
     if price != body.expected_price:
         raise HTTPException(409, "Price has changed. Refresh and confirm the new amount")
     overlaps = db.query(models.MealPlan).filter(models.MealPlan.user_id == user.id,
-        models.MealPlan.status.in_(["active", "pending_payment"]),
+        models.MealPlan.status.in_(["active", "pending_payment", "pending_acceptance"]),
         models.MealPlan.start_date <= end, models.MealPlan.end_date >= start).all()
     if any(body.offer_id is not None or p.meal_id is None or p.meal_id == body.meal_id for p in overlaps):
         raise HTTPException(409, "You already have a booking or checkout covering these dates. Continue payment from your history.")
@@ -102,7 +103,9 @@ def activate_paid_purchase(plan, db):
     paid = sum((r.amount for r in db.query(models.PaymentRecord).filter_by(plan_id=plan.id)), Decimal("0"))
     if paid < plan.price:
         return
-    plan.status = "active"
+    plan.status = "pending_acceptance" if plan.meal_id and not plan.accepted else "active"
+    if plan.status != "active":
+        return
     if plan.meal_id and not db.query(models.MealOrder).filter_by(user_id=plan.user_id, meal_id=plan.meal_id).first():
         db.add(models.MealOrder(user_id=plan.user_id, meal_id=plan.meal_id, status="confirmed", extra_cost=0))
 
@@ -148,3 +151,28 @@ def activity(db: Session = Depends(get_db), user=Depends(customer)):
     submissions = [{"plan_id": bill_plans.get(s.bill_id), "id": s.id, "bill_id": s.bill_id, "amount": float(s.amount), "method": s.method,
         "status": s.status, "created_at": s.created_at} for s in db.query(models.PaymentSubmission).filter_by(user_id=user.id).order_by(models.PaymentSubmission.id.desc())]
     return {"meals": rows, "purchases": purchases, "receipts": receipts, "submissions": submissions}
+
+
+@router.get("/owner/personal-orders")
+def personal_orders(db: Session = Depends(get_db), owner=Depends(require_owner)):
+    plans = db.query(models.MealPlan).filter(models.MealPlan.meal_id.is_not(None),
+        models.MealPlan.status.in_(["pending_payment", "pending_acceptance", "active"])
+    ).order_by(models.MealPlan.id.desc()).all()
+    return [{**purchase_output(p, db), "customer_name": db.get(models.User, p.user_id).name,
+             "accepted": p.accepted} for p in plans]
+
+
+@router.post("/owner/personal-orders/{plan_id}/accept")
+def accept_order(plan_id: int, db: Session = Depends(get_db), owner=Depends(require_owner)):
+    plan = db.query(models.MealPlan).filter_by(id=plan_id).with_for_update().first()
+    if not plan or not plan.meal_id:
+        raise HTTPException(404, "Personal meal order not found")
+    if plan.status == "active" and plan.accepted:
+        return {"message": "Order already accepted"}
+    if plan.status != "pending_acceptance":
+        raise HTTPException(409, "Confirm full payment before accepting this order")
+    plan.accepted = True
+    plan.status = "pending_payment"
+    activate_paid_purchase(plan, db)
+    db.commit()
+    return {"message": "Meal order accepted", **purchase_output(plan, db)}

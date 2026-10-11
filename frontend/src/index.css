@@ -1158,3 +1158,6 @@ html[lang="hi"] h1, html[lang="hi"] h2, html[lang="hi"] h3 { line-height:1.35; }
  .join-signup-card .meal-form > .join-phone-column { grid-column:1; grid-row:1; }
  .join-signup-card .meal-form > .join-details-column { grid-column:1; grid-row:2; }
 }
+
+.customer-overview h1 { margin: 8px 0; overflow-wrap: anywhere; }
+.customer-plan-row + .customer-plan-row { border-top: 1px solid #dce7df; margin-top: 16px; padding-top: 16px; }

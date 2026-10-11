@@ -13,7 +13,7 @@ class PurchaseTests(test_app.ApplicationTests):
         return self.client.post('/customer/checkout', headers=self.customer, json={'purchase_key': str(uuid4()), **choice})
 
     def pay(self, bill, amount, approve=True):
-        r = self.client.post('/payments/submissions', headers=self.customer, data={'bill_id': bill, 'amount': str(amount), 'method': 'cash'})
+        r = self.client.post('/payments/submissions', headers=self.customer, data={'bill_id': bill, 'amount': str(amount), 'method': 'upi'}, files={'file':('proof.png', b'\x89PNG\r\n\x1a\n' + b'0'*40 + b'IEND\xaeB`\x82', 'image/png')})
         self.assertEqual(r.status_code, 201, r.text)
         submission = self.client.get('/payments/submissions', headers=self.customer).json()[0]['id']
         if approve:
@@ -50,6 +50,9 @@ class PurchaseTests(test_app.ApplicationTests):
         self.assertEqual(r.status_code, 201, r.text)
         self.assertEqual(self.client.get('/dashboard/headcount', headers=self.owner).json()['meals'][0]['expected_headcount'], 0)
         self.pay(r.json()['id'], 120)
+        order = self.client.get('/owner/personal-orders', headers=self.owner).json()[0]
+        self.assertEqual(order['status'], 'pending_acceptance')
+        self.assertEqual(self.client.post(f"/owner/personal-orders/{order['plan_id']}/accept", headers=self.owner).status_code, 200)
         counts = self.client.get('/dashboard/headcount', headers=self.owner).json()['meals']
         self.assertEqual(next(m for m in counts if m['meal_id'] == lunch['id'])['expected_headcount'], 1)
         self.assertEqual(next(m for m in counts if m['meal_id'] == dinner['id'])['expected_headcount'], 0)
@@ -84,7 +87,7 @@ class PurchaseTests(test_app.ApplicationTests):
         self.assertEqual(self.client.get('/customer/activity', headers=other).json()['purchases'], [])
         self.assertEqual(self.client.delete(f"/customer/checkout/{r.json()['plan_id']}", headers=other).status_code,404)
         self.assertEqual(self.client.delete(f"/customer/checkout/{r.json()['plan_id']}", headers=self.customer).status_code,200)
-        self.assertEqual(self.client.post('/payments/submissions', headers=self.customer, data={'bill_id':r.json()['id'], 'amount':100, 'method':'cash'}).status_code,409)
+        self.assertEqual(self.client.post('/payments/submissions', headers=self.customer, data={'bill_id':r.json()['id'], 'amount':100, 'method':'upi'}).status_code,409)
         self.assertEqual(self.buy(meal_id=meal['id'], expected_price=99).status_code,409)
         self.assertEqual(self.buy(meal_id=meal['id'], expected_price=100).status_code,201)
 

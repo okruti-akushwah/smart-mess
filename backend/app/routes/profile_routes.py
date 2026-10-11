@@ -8,6 +8,7 @@ from app.database import get_db
 from app.routes.owner_meal_routes import require_owner
 from app.routes.join_routes import invite, find_invite
 from app.tenancy import public_db
+from app.routes.discovery_routes import customer
 
 router = APIRouter(tags=['public mess page'])
 
@@ -25,6 +26,10 @@ class TimingInput(BaseModel):
 
 
 class ProfileInput(BaseModel):
+    name_hi: str = Field(default="", max_length=100)
+    about_hi: str = Field(default="", max_length=2000)
+    preparation_hi: str = Field(default="", max_length=3000)
+    address_hi: str = Field(default="", max_length=500)
     name: str = Field(default='', max_length=100)
     address: str = Field(default='', max_length=500)
     contact: str = Field(default='', max_length=100)
@@ -41,7 +46,7 @@ class ProfileInput(BaseModel):
             raise ValueError('Each meal timing can only appear once')
         return value
 
-    @field_validator('name', 'address', 'contact', 'hours', 'about', 'preparation')
+    @field_validator('name', 'address', 'contact', 'hours', 'about', 'preparation', 'name_hi', 'about_hi', 'preparation_hi', 'address_hi')
     @classmethod
     def trim(cls, value):
         return value.strip()
@@ -69,6 +74,8 @@ def save_profile(body: ProfileInput, db: Session = Depends(get_db), owner=Depend
         item = models.MessProfile(owner_id=owner.id)
         db.add(item)
     for field, value in body.model_dump(exclude={"timings"}).items():
+        if field.endswith("_hi") and field not in body.model_fields_set:
+            continue
         setattr(item, field, value)
     if body.timings is not None:
         db.query(models.MealTiming).filter_by(owner_id=owner.id).delete()
@@ -99,7 +106,7 @@ def public_profile(token: str, db: Session = Depends(public_db)):
 @router.get('/public/messes')
 def mess_directory(db: Session = Depends(get_db)):
     owners = db.query(models.User).filter_by(role='owner').order_by(models.User.id).all()
-    return [{'name': output(owner, db)['name'], 'join_token': invite(db, owner)['token']}
+    return [{'name': output(owner, db)['name'], 'name_hi': output(owner, db)['name_hi'], 'join_token': invite(db, owner)['token']}
             for owner in owners]
 
 
@@ -116,3 +123,20 @@ def save_guest_price(body: GuestPriceInput, db: Session = Depends(get_db), owner
     setting.price = body.price
     db.commit()
     return {'price': float(setting.price), 'message': 'Guest price saved'}
+
+
+@router.get('/customer/account')
+def customer_account(db: Session = Depends(get_db), user=Depends(customer)):
+    from datetime import date
+    owner = db.get(models.User, db.info['mess_owner_id'])
+    profile = db.get(models.MessProfile, owner.id)
+    pauses = db.query(models.MealDatePause).filter(
+        models.MealDatePause.user_id == user.id,
+        models.MealDatePause.active.is_(True),
+        models.MealDatePause.date >= date.today()).order_by(models.MealDatePause.date).all()
+    return {'customer_name': user.name,
+            'mess_name': profile.name if profile and profile.name else f'{owner.name}’s mess',
+            'mess_name_hi': profile.name_hi if profile else '',
+            'contact': profile.contact if profile else '',
+            'address': profile.address if profile else '',
+            'paused_dates': [item.date.isoformat() for item in pauses]}

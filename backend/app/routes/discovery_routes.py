@@ -155,7 +155,7 @@ def decide(request_id: int, body: Decision, db: Session = Depends(get_db), user=
 @router.get("/subscriptions/current")
 def current_plan(db: Session = Depends(get_db), user=Depends(customer)):
     return [{"id": p.id, "name": p.plan_type, "price": float(p.price), "meal_price": float(p.meal_price),
-             "start_date": p.start_date, "end_date": p.end_date} for p in db.query(models.MealPlan).filter(models.MealPlan.user_id == user.id, models.MealPlan.meal_id.is_(None), models.MealPlan.status == "active", models.MealPlan.end_date >= date.today()).order_by(models.MealPlan.start_date).all()]
+             "start_date": p.start_date, "end_date": p.end_date, "skip_count": p.skip_count or 0} for p in db.query(models.MealPlan).filter(models.MealPlan.user_id == user.id, models.MealPlan.meal_id.is_(None), models.MealPlan.status == "active", models.MealPlan.end_date >= date.today()).order_by(models.MealPlan.start_date).all()]
 
 
 class PauseInput(BaseModel):
@@ -164,16 +164,42 @@ class PauseInput(BaseModel):
 
 
 def pause_result(body, db, user, apply=False):
+    from app.subscription_extensions import lock_customer, change_extension
+    from app.date_pauses import lock_mess
+    if apply:
+        lock_mess(db)
+        lock_customer(db, user.id)
     if body.start_date < date.today() or body.end_date < body.start_date or (body.end_date - body.start_date).days > 90:
         raise HTTPException(422, "Choose today or future dates, with the end on or after the start, up to 91 days")
     plans = db.query(models.MealPlan).filter(models.MealPlan.user_id == user.id, models.MealPlan.meal_id.is_(None), models.MealPlan.status == "active", models.MealPlan.start_date <= body.end_date, models.MealPlan.end_date >= body.start_date).all()
     if not plans:
         raise HTTPException(400, "No active subscription covers these dates. Choose dates within your subscription.")
+    covered_dates = {}
+    cursor = body.start_date
+    while cursor <= body.end_date:
+        covering = next((p for p in plans if p.start_date <= cursor <= p.end_date), None)
+        if covering:
+            covered_dates[cursor] = covering
+        cursor += timedelta(days=1)
+    saved = {p.date: p for p in db.query(models.MealDatePause).filter(
+        models.MealDatePause.user_id == user.id, models.MealDatePause.date >= body.start_date,
+        models.MealDatePause.date <= body.end_date).all()}
+    new_dates = [day for day in covered_dates if day not in saved or not saved[day].active]
+    if apply:
+        for day in new_dates:
+            row = saved.get(day)
+            if row:
+                row.active, row.plan_id = True, covered_dates[day].id
+                row.created_at = datetime.now(timezone.utc).replace(tzinfo=None)
+            else:
+                db.add(models.MealDatePause(user_id=user.id, plan_id=covered_dates[day].id, date=day))
+        db.flush()
     meals = db.query(models.Meal).filter(models.Meal.date >= body.start_date, models.Meal.date <= body.end_date).order_by(models.Meal.date, models.Meal.id).all()
+    coverage_dates = {p.id: (p.start_date, p.end_date) for p in plans}
     now = datetime.now(timezone.utc)
     eligible, unchanged = [], []
     for meal in meals:
-        plan = next((p for p in plans if p.start_date <= meal.date <= p.end_date), None)
+        plan = next((p for p in plans if coverage_dates[p.id][0] <= meal.date <= coverage_dates[p.id][1]), None)
         delivery = db.query(models.DeliveryUpdate).filter_by(user_id=user.id, meal_id=meal.id).first()
         order = db.query(models.MealOrder).filter_by(user_id=user.id, meal_id=meal.id).first()
         reason = None
@@ -191,25 +217,33 @@ def pause_result(body, db, user, apply=False):
         if reason:
             unchanged.append({**item, "reason": reason})
             continue
-        eligible.append({**item, "deduction": float(plan.meal_price or 0)})
+        eligible.append({**item, "deduction": 0, "extension_days": 1})
         if apply:
             if not order:
                 order = models.MealOrder(user_id=user.id, meal_id=meal.id)
                 db.add(order)
+            order.extension_plan_id = plan.id
+            change_extension(db, plan, 1)
             order.status = "skipped"
             order.extra_cost = 0
             order.extra_items = None
     if apply:
         db.commit()
-    if not meals:
-        message = "No menus are published for these dates yet. Nothing was paused. Choose dates with published meals; menus added later are not automatically paused."
-    elif not eligible:
-        message = "No meals changed. All published meals in this range are already skipped or ineligible; see the reasons below."
-    elif apply:
-        message = f"Paused {len(eligible)} meal(s). Your bill and the owner's meal count have been updated."
+    if apply:
+        message = f"Pause saved for {len(covered_dates)} date(s). Meals published later on these dates will be skipped automatically."
+        if eligible:
+            message += f" {len(eligible)} published meal(s) skipped; {len(eligible)} subscription day(s) added."
     else:
-        message = f"{len(eligible)} meal(s) can be paused."
-    return {"message": message, "skipped": len(eligible) if apply else 0, "eligible_count": len(eligible), "meals": eligible, "unchanged": unchanged, "published_count": len(meals), "deductions": sum(item['deduction'] for item in eligible)}
+        message = f"You can pause {len(covered_dates)} date(s), even before menus are published. Future meals on these dates will be skipped automatically."
+    saved_dates = [p.date for p in db.query(models.MealDatePause).filter(
+        models.MealDatePause.user_id == user.id, models.MealDatePause.active == True,
+        models.MealDatePause.date >= date.today()).order_by(models.MealDatePause.date).all()]
+    return {"message": message, "pause_saved": apply, "can_pause": bool(covered_dates),
+        "paused_dates": sorted(covered_dates) if apply else [], "saved_dates": saved_dates,
+        "new_pause_dates": len(new_dates), "covered_days": len(covered_dates),
+        "skipped": len(eligible) if apply else 0, "eligible_count": len(eligible), "meals": eligible,
+        "unchanged": unchanged, "published_count": len(meals), "extension_days": len(eligible), "deductions": 0}
+
 
 
 @router.get("/subscriptions/pause-preview")

@@ -95,7 +95,7 @@ def get_current_bill(
 
     meal_price = Decimal(str(meal_plan.meal_price or 0))
 
-    deductions = meal_price * skipped_meals
+    deductions = meal_price * sum(1 for order in skipped_orders if order.extension_plan_id is None)
 
     # -----------------------------------------------------
     # 6. Calculate extras / guest costs
@@ -144,6 +144,7 @@ def get_current_bill(
         "meal_price": float(meal_price),
 
         "skipped_meals": skipped_meals,
+        "extension_days": meal_plan.skip_count or 0,
 
         "deductions": float(deductions),
 

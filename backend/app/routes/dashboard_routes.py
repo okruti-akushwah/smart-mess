@@ -21,8 +21,6 @@ def get_tomorrow_headcount(
 
     tomorrow = date.today() + timedelta(days=1)
     meals = db.query(models.Meal).filter(models.Meal.date == tomorrow).order_by(models.Meal.meal_type).all()
-    if not meals:
-        return {"date": tomorrow.isoformat(), "meals": []}
 
     active_plans = (
         db.query(models.MealPlan)
@@ -79,4 +77,5 @@ def get_tomorrow_headcount(
             }
         )
 
-    return {"date": tomorrow.isoformat(), "meals": result}
+    from app.routes.preparation import preparation
+    return {"date": tomorrow.isoformat(), "meals": result, **preparation(db)}

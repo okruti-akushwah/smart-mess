@@ -8,6 +8,7 @@ from app.auth import get_current_user
 from app.database import get_db
 from app.menu_images import validate_image
 from app.menu_catalog import remember
+from app.date_pauses import lock_mess, apply_date_pauses
 
 
 router = APIRouter(
@@ -71,6 +72,7 @@ def create_meal(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_owner),
 ):
+    lock_mess(db)
     meal_type = req.meal_type.strip().lower()
 
     if meal_type not in {
@@ -116,6 +118,8 @@ def create_meal(
     )
 
     db.add(meal)
+    db.flush()
+    apply_date_pauses(db, meal)
     remember(db, current_user.id, meal.menu_description)
     db.commit()
     db.refresh(meal)
@@ -149,6 +153,8 @@ def update_meal(
             detail="Meal not found",
         )
 
+    lock_mess(db)
+    previous_date = meal.date
     update_data = req.model_dump(
         exclude_unset=True
     )
@@ -194,6 +200,9 @@ def update_meal(
     for field, value in update_data.items():
         setattr(meal, field, value)
 
+    if meal.date != previous_date:
+        db.flush()
+        apply_date_pauses(db, meal)
     remember(db, current_user.id, meal.menu_description)
     db.commit()
     db.refresh(meal)

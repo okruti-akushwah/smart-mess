@@ -32,7 +32,7 @@ export default function SubscriptionManager() {
       <form className="meal-form" onSubmit={submit}>
       <label className="form-field">{translate("Customer")}<select required name="user_id" value={form.user_id} onChange={change}><option value="">{translate("Choose a customer")}</option>{customers.map((c) => <option key={c.id} value={c.id}>{c.name} · {c.phone}</option>)}</select></label>
       <label className="form-field">{translate("Plan amount (₹)")}<input required type="number" min="1" step="0.01" name="price" value={form.price} onChange={change} /></label>
-      <label className="form-field">{translate("Deduction per skipped meal (₹)")}<input required type="number" min="1" step="0.01" name="meal_price" value={form.meal_price} onChange={change} /></label>
+      <p className="muted">Each skipped meal adds one subscription day.</p>
       <label className="form-field">{translate("Starts on")}<input required type="date" name="start_date" value={form.start_date} onChange={change} /></label>
       <label className="form-field">{translate("Ends on")}<input required type="date" min={form.start_date} name="end_date" value={form.end_date} onChange={change} /></label>
       <div className="form-actions"><button className="btn btn-primary" disabled={saving}>{translate(saving ? "Assigning…" : "Assign subscription")}</button></div>

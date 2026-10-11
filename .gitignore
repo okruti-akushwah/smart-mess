@@ -10,3 +10,4 @@ backend/generated_menu_images/
 backend/payment_images/
 backend/payment_proofs/
 frontend/.npm-cache/
+output/local-demo-backups/

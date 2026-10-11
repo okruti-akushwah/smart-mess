@@ -75,7 +75,7 @@ def submission_output(s, db):
 
 @router.post("/payments/submissions", status_code=201)
 async def submit_payment(bill_id: int = Form(...), amount: Decimal = Form(...),
-                         method: Literal["upi", "cash"] = Form(...), reference: str = Form(""),
+                         method: Literal["upi"] = Form(...), reference: str = Form(""),
                          file: UploadFile | None = File(None), db: Session = Depends(get_db), user=Depends(customer)):
     bill = db.query(models.IssuedBill).filter_by(id=bill_id, user_id=user.id).first()
     if not bill:
