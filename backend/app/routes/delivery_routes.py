@@ -3,6 +3,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
+from app.meal_coverage import covers
 from app import models
 from app.database import get_db
 from app.routes.discovery_routes import customer
@@ -63,7 +64,7 @@ def deliveries_for(day, db):
     for meal in meals:
         end = timings.get(meal.meal_type)
         serving_ends_at = datetime.combine(day, datetime.strptime(end, "%H:%M").time(), tzinfo=timezone(timedelta(hours=5, minutes=30))).isoformat() if end else None
-        for user_id in sorted({p.user_id for p in plans if p.meal_id is None or p.meal_id == meal.id}):
+        for user_id in sorted({p.user_id for p in plans if covers(p, meal)}):
             order = orders.get((user_id, meal.id))
             if order and order.status == "skipped":
                 continue

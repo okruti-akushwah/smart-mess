@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from app.meal_coverage import included_types
 from app import models, schemas, auth, signup_otp
 from app.database import get_db
 from app.routes.owner_meal_routes import require_owner
@@ -142,7 +143,7 @@ def decide(request_id: int, body: Decision, db: Session = Depends(get_db), owner
             overlap = db.query(models.MealPlan).filter(models.MealPlan.user_id == item.user_id, models.MealPlan.status == 'active', models.MealPlan.start_date <= end, models.MealPlan.end_date >= selection.start_date).first()
             if overlap:
                 raise HTTPException(409, 'Customer already has a subscription for these dates')
-            db.add(models.MealPlan(user_id=item.user_id, offer_id=offer.id, price=offer.price, meal_price=offer.meal_price, start_date=selection.start_date, end_date=end, status='active', plan_type=offer.name))
+            db.add(models.MealPlan(user_id=item.user_id, offer_id=offer.id, meal_types=list(included_types(offer)), price=offer.price, meal_price=offer.meal_price, start_date=selection.start_date, end_date=end, status='active', plan_type=offer.name))
     item.status = body.status
     db.commit()
     message = 'Join request declined.'

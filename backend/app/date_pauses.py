@@ -1,6 +1,7 @@
 """Persist date intentions and apply them when a subscribed menu is published."""
 from datetime import date, datetime, timezone
 from app import models
+from app.meal_coverage import covers
 from app.subscription_extensions import lock_customer, change_extension
 
 
@@ -18,7 +19,7 @@ def apply_date_pauses(db, meal):
     for pause in pauses:
         lock_customer(db, pause.user_id)
         plan = db.get(models.MealPlan, pause.plan_id)
-        if not plan or plan.status != "active" or not plan.start_date <= meal.date <= plan.end_date:
+        if not plan or plan.status != "active" or not covers(plan, meal):
             continue
         # A saved pause before a cutoff remains effective even if publishing happens later.
         if meal.cutoff_time and pause.created_at.replace(tzinfo=timezone.utc) >= meal.cutoff_time.replace(tzinfo=timezone.utc):

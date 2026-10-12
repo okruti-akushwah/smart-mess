@@ -1161,3 +1161,6 @@ html[lang="hi"] h1, html[lang="hi"] h2, html[lang="hi"] h3 { line-height:1.35; }
 
 .customer-overview h1 { margin: 8px 0; overflow-wrap: anywhere; }
 .customer-plan-row + .customer-plan-row { border-top: 1px solid #dce7df; margin-top: 16px; padding-top: 16px; }
+
+.plan-meal-option { display: flex; align-items: center; gap: 10px; text-transform: capitalize; }
+.plan-meal-option input { width: auto; margin: 0; }

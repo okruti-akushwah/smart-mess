@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app import models, schemas
+from app.meal_coverage import covers
 from app.auth import get_current_user
 from app.subscription_extensions import lock_customer, change_extension
 
@@ -19,7 +20,7 @@ def ensure_not_dispatched(db, user_id, meal_id):
     if not user or user.role != "customer":
         raise HTTPException(403, "Customer access required")
     meal = db.get(models.Meal, meal_id)
-    if meal and not db.query(models.MealPlan).filter(models.MealPlan.user_id == user_id, models.MealPlan.meal_id.is_(None), models.MealPlan.status == "active", models.MealPlan.start_date <= meal.date, models.MealPlan.end_date >= meal.date).first():
+    if meal and not any(covers(p, meal) for p in db.query(models.MealPlan).filter(models.MealPlan.user_id == user_id, models.MealPlan.meal_id.is_(None), models.MealPlan.status == "active", models.MealPlan.start_date <= meal.date, models.MealPlan.end_date >= meal.date).all()):
         raise HTTPException(403, "An active subscription must cover this meal before you can skip it or add guests")
     delivery = db.query(models.DeliveryUpdate).filter_by(user_id=user_id, meal_id=meal_id).first()
     if delivery and delivery.status in ("out_for_delivery", "delivered"):
@@ -57,8 +58,8 @@ def get_todays_meals(
     plans = db.query(models.MealPlan).filter_by(user_id=current_user.id, status="active").all()
     return [schemas.MealOut.model_validate(meal).model_copy(update={
         "status": statuses.get(meal.id, "confirmed"),
-        "can_manage": any(p.meal_id is None and p.start_date <= meal.date <= p.end_date for p in plans),
-        "booked": any(p.start_date <= meal.date <= p.end_date and (p.meal_id is None or p.meal_id == meal.id) for p in plans),
+        "can_manage": any(p.meal_id is None and covers(p, meal) for p in plans),
+        "booked": any(covers(p, meal) for p in plans),
     }) for meal in meals]
 
 
@@ -83,8 +84,8 @@ def get_upcoming_meals(
     plans = db.query(models.MealPlan).filter_by(user_id=current_user.id, status="active").all()
     return [schemas.MealOut.model_validate(meal).model_copy(update={
         "status": statuses.get(meal.id, "confirmed"),
-        "can_manage": any(p.meal_id is None and p.start_date <= meal.date <= p.end_date for p in plans),
-        "booked": any(p.start_date <= meal.date <= p.end_date and (p.meal_id is None or p.meal_id == meal.id) for p in plans),
+        "can_manage": any(p.meal_id is None and covers(p, meal) for p in plans),
+        "booked": any(covers(p, meal) for p in plans),
     }) for meal in meals]
 
 
@@ -136,11 +137,11 @@ def skip_meal(
             detail="You have already skipped this meal."
         )
 
-    plan = db.query(models.MealPlan).filter(
+    plan = next(p for p in db.query(models.MealPlan).filter(
         models.MealPlan.user_id == current_user.id, models.MealPlan.meal_id.is_(None),
         models.MealPlan.status == "active", models.MealPlan.start_date <= meal.date,
         models.MealPlan.end_date >= meal.date,
-    ).with_for_update().first()
+    ).with_for_update().all() if covers(p, meal))
     order = existing_order or models.MealOrder(user_id=current_user.id, meal_id=meal.id)
     order.status, order.extra_items, order.extra_cost = "skipped", None, 0
     order.extension_plan_id = plan.id

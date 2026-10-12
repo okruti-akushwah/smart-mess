@@ -107,3 +107,10 @@ def add_profile_languages(engine):
         for field in ("name_hi", "about_hi", "preparation_hi", "address_hi"):
             if field not in columns:
                 connection.execute(text(f"ALTER TABLE mess_profiles ADD COLUMN {field} VARCHAR DEFAULT ''"))
+
+
+def add_plan_meal_types(engine):
+    with engine.begin() as connection:
+        for table in ('plan_offers', 'meal_plans'):
+            if 'meal_types' not in {c['name'] for c in inspect(connection).get_columns(table)}:
+                connection.execute(text(f"ALTER TABLE {table} ADD COLUMN meal_types JSON NOT NULL DEFAULT '[\"breakfast\", \"lunch\", \"dinner\"]'"))

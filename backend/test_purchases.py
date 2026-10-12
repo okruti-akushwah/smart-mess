@@ -44,16 +44,16 @@ class PurchaseTests(test_app.ApplicationTests):
 
     def test_single_meal_books_only_selected_meal_and_reviews_next_day(self):
         self.address()
-        lunch = self.meal(single_price=120)
-        dinner = self.meal(meal_type='dinner', single_price=150)
+        lunch = self.meal(days=0, single_price=120)
+        dinner = self.meal(days=0, meal_type='dinner', single_price=150)
         r = self.buy(meal_id=lunch['id'], expected_price=120)
         self.assertEqual(r.status_code, 201, r.text)
-        self.assertEqual(self.client.get('/dashboard/headcount', headers=self.owner).json()['meals'][0]['expected_headcount'], 0)
+        self.assertEqual(self.client.get('/dashboard/headcount', headers=self.owner).json()['preparation'][0]['expected_headcount'], 0)
         self.pay(r.json()['id'], 120)
         order = self.client.get('/owner/personal-orders', headers=self.owner).json()[0]
         self.assertEqual(order['status'], 'pending_acceptance')
         self.assertEqual(self.client.post(f"/owner/personal-orders/{order['plan_id']}/accept", headers=self.owner).status_code, 200)
-        counts = self.client.get('/dashboard/headcount', headers=self.owner).json()['meals']
+        counts = self.client.get('/dashboard/headcount', headers=self.owner).json()['preparation']
         self.assertEqual(next(m for m in counts if m['meal_id'] == lunch['id'])['expected_headcount'], 1)
         self.assertEqual(next(m for m in counts if m['meal_id'] == dinner['id'])['expected_headcount'], 0)
         self.assertEqual(self.client.get('/subscriptions/current', headers=self.customer).json(), [])
@@ -77,7 +77,7 @@ class PurchaseTests(test_app.ApplicationTests):
 
     def test_checkout_retry_cancel_price_and_ownership(self):
         self.address()
-        meal = self.meal(single_price=100)
+        meal = self.meal(days=0, single_price=100)
         key = str(uuid4())
         body = {'meal_id':meal['id'], 'expected_price':100, 'purchase_key':key}
         r = self.client.post('/customer/checkout', headers=self.customer, json=body)
@@ -93,7 +93,7 @@ class PurchaseTests(test_app.ApplicationTests):
 
     def test_unpaid_and_undelivered_meals_not_reviewable(self):
         self.address()
-        meal = self.meal(single_price=100)
+        meal = self.meal(days=0, single_price=100)
         r = self.buy(meal_id=meal['id'], expected_price=100)
         with self.Session() as db:
             m = db.get(models.Meal, meal['id']); m.date = date.today()-timedelta(days=1)
@@ -107,7 +107,7 @@ class PurchaseTests(test_app.ApplicationTests):
 
     def test_single_price_required_and_booked_meal_cannot_move_or_delete(self):
         self.address()
-        meal = self.meal()
+        meal = self.meal(days=0)
         self.assertEqual(self.buy(meal_id=meal['id'], expected_price=100).status_code,409)
         self.assertEqual(self.client.put(f"/owner/meals/{meal['id']}", headers=self.owner, json={'single_price':-2}).status_code,422)
         self.client.put(f"/owner/meals/{meal['id']}", headers=self.owner, json={'single_price':100})
@@ -151,3 +151,14 @@ class PurchaseTests(test_app.ApplicationTests):
             self.assertEqual(connection.execute(text('SELECT menu_description, single_price FROM meals')).one(),('Dal and roti',None))
             self.assertEqual(connection.execute(text('SELECT price, meal_id, purchase_key FROM meal_plans')).one(),(700,None,None))
         engine.dispose()
+
+    def test_single_meal_ordering_is_today_only(self):
+        self.address()
+        tomorrow = self.meal(single_price=100)
+        past = self.meal(days=-1, single_price=100)
+        for meal in [tomorrow, past]:
+            result = self.buy(meal_id=meal['id'], expected_price=100)
+            self.assertEqual(result.status_code, 409, result.text)
+            self.assertIn("today's menu", result.json()['detail'])
+        today = self.meal(days=0, single_price=100)
+        self.assertEqual(self.buy(meal_id=today['id'], expected_price=100).status_code, 201)

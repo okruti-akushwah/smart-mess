@@ -19,6 +19,10 @@ The local `.env`, SQLite databases, payment uploads and private connection backu
 
 Open your existing backend service. Keep its production PostgreSQL/Supabase `DATABASE_URL` and stable `SECRET_KEY`.
 
+Local and live databases are separate: `backend/.env` configures local development only. Set the live PostgreSQL `DATABASE_URL` directly in Render Environment. The backend now refuses to start on Render if that setting is missing or points to SQLite, and never loads the local `.env` there.
+
+Before saving environment changes or redeploying a service that previously used SQLite, use Render Shell (if available) to locate and back up its existing `mess.db`. A redeploy can discard that file. Connecting PostgreSQL does not migrate those records automatically. If the file is already gone, recovery requires a previous backup. Do not seed or reset databases during recovery.
+
 With Root Directory set to `backend`:
 
 | Setting | Value |

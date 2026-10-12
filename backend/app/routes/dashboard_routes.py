@@ -1,3 +1,4 @@
+from app.meal_coverage import covers
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -35,7 +36,7 @@ def get_tomorrow_headcount(
     result = []
 
     for meal in meals:
-        subscriber_ids = {p.user_id for p in active_plans if p.meal_id is None or p.meal_id == meal.id}
+        subscriber_ids = {p.user_id for p in active_plans if covers(p, meal)}
         skipped_ids = set()
         guest_count = 0
         if subscriber_ids:

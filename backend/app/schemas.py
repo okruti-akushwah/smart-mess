@@ -116,6 +116,15 @@ class MealOrderOut(BaseModel):
 
 
 class PlanCreate(BaseModel):
+    meal_types: list[Literal["breakfast", "lunch", "dinner"]] = Field(default_factory=lambda: ["breakfast", "lunch", "dinner"], min_length=1, max_length=3)
+
+    @field_validator("meal_types")
+    @classmethod
+    def unique_meal_types(cls, value):
+        if len(value) != len(set(value)):
+            raise ValueError("Choose each meal type only once")
+        return [kind for kind in ["breakfast", "lunch", "dinner"] if kind in value]
+
     user_id: int
     price: float = Field(gt=0, allow_inf_nan=False)
     meal_price: float = Field(gt=0, allow_inf_nan=False)

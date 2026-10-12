@@ -10,9 +10,12 @@ export default function PersonalOrders({ onUpdate }) {
     try {
       const { data } = await api.get("/owner/personal-orders");
       setOrders(data);
-      const fresh = data.find(order => !order.accepted && !dismissed.current.has(`${order.plan_id}-${order.status}`)
+      const fresh = data.find(order => order.status === "pending_acceptance" && Number(order.balance_due) === 0 && !order.accepted && !dismissed.current.has(`${order.plan_id}-${order.status}`)
         && known.current.get(order.plan_id) !== order.status);
-      if (fresh) setNotification(fresh);
+      setNotification(previous => {
+        if (fresh) return fresh;
+        return previous && data.some(order => order.plan_id === previous.plan_id && order.status === "pending_acceptance" && Number(order.balance_due) === 0 && !order.accepted) ? previous : null;
+      });
       known.current = new Map(data.map(order => [order.plan_id, order.status]));
     } catch (e) { setError(errorMessage(e)); }
   }, []);

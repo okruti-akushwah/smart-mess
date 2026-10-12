@@ -5,7 +5,7 @@ import api, { errorMessage } from "../services/api";
 export default function SubscriptionManager() {
   const translate = useTranslation();
   const [customers, setCustomers] = useState([]);
-  const [form, setForm] = useState({ user_id: "", price: 3000, meal_price: 50, start_date: "", end_date: "" });
+  const [form, setForm] = useState({ user_id: "", price: 3000, meal_price: 50, meal_types: ["breakfast", "lunch", "dinner"], start_date: "", end_date: "" });
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -32,10 +32,10 @@ export default function SubscriptionManager() {
       <form className="meal-form" onSubmit={submit}>
       <label className="form-field">{translate("Customer")}<select required name="user_id" value={form.user_id} onChange={change}><option value="">{translate("Choose a customer")}</option>{customers.map((c) => <option key={c.id} value={c.id}>{c.name} · {c.phone}</option>)}</select></label>
       <label className="form-field">{translate("Plan amount (₹)")}<input required type="number" min="1" step="0.01" name="price" value={form.price} onChange={change} /></label>
-      <p className="muted">Each skipped meal adds one subscription day.</p>
+      <fieldset className="form-field"><legend>Meals included</legend>{["breakfast", "lunch", "dinner"].map(type => <label key={type} className="plan-meal-option"><input type="checkbox" checked={form.meal_types.includes(type)} onChange={e => setForm(previous => ({ ...previous, meal_types: e.target.checked ? [...previous.meal_types, type] : previous.meal_types.filter(value => value !== type) }))} />{translate(type)}</label>)}{!form.meal_types.length && <p role="alert">Choose at least one meal.</p>}</fieldset><p className="muted">Each skipped meal adds one subscription day.</p>
       <label className="form-field">{translate("Starts on")}<input required type="date" name="start_date" value={form.start_date} onChange={change} /></label>
       <label className="form-field">{translate("Ends on")}<input required type="date" min={form.start_date} name="end_date" value={form.end_date} onChange={change} /></label>
-      <div className="form-actions"><button className="btn btn-primary" disabled={saving}>{translate(saving ? "Assigning…" : "Assign subscription")}</button></div>
+      <div className="form-actions"><button className="btn btn-primary" disabled={saving || !form.meal_types.length}>{translate(saving ? "Assigning…" : "Assign subscription")}</button></div>
     </form>}
   </section>;
 }

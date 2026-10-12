@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app import models
 from app.auth import get_current_user
+from app.meal_coverage import covers, included_types
 
 
 router = APIRouter(prefix="/bills", tags=["billing"])
@@ -81,6 +82,8 @@ def get_current_bill(
     # 4. Count skipped meals
     # -----------------------------------------------------
 
+    orders = [order for order in orders if covers(meal_plan, order.meal)]
+
     skipped_orders = [
         order
         for order in orders
@@ -135,7 +138,7 @@ def get_current_bill(
         "credit": float(max(paid - final_amount, Decimal("0"))),
         "month": today.strftime("%Y-%m"),
 
-        "plan_type": meal_plan.plan_type,
+        "plan_type": meal_plan.plan_type, "meal_types": included_types(meal_plan),
         "start_date": meal_plan.start_date.isoformat(),
         "end_date": meal_plan.end_date.isoformat(),
 

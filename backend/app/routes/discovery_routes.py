@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_
 from app import models, schemas
+from app.meal_coverage import covers, included_types
 from app.auth import get_current_user
 from app.database import get_db
 from app.routes.owner_meal_routes import require_owner
@@ -20,6 +21,15 @@ def customer(user=Depends(get_current_user)):
 
 
 class OfferInput(BaseModel):
+
+    @field_validator("meal_types")
+    @classmethod
+    def unique_meal_types(cls, value):
+        if len(value) != len(set(value)):
+            raise ValueError("Choose each meal type only once")
+        return [kind for kind in ["breakfast", "lunch", "dinner"] if kind in value]
+
+    meal_types: list[Literal["breakfast", "lunch", "dinner"]] = Field(default_factory=lambda: ["breakfast", "lunch", "dinner"], min_length=1, max_length=3)
     name: str = Field(min_length=3, max_length=80)
     category: Literal["regular", "mini", "protein", "special"] = "regular"
     duration_days: int = Field(ge=1, le=365)
@@ -38,7 +48,7 @@ class OfferInput(BaseModel):
 def offer_output(offer):
     return {"id": offer.id, "name": offer.name, "category": offer.category,
             "duration_days": offer.duration_days, "price": float(offer.price),
-            "meal_price": float(offer.meal_price), "description": offer.description}
+            "meal_types": included_types(offer), "meal_price": float(offer.meal_price), "description": offer.description}
 
 
 @router.get("/public/menu", response_model=list[schemas.MealOut])
@@ -146,7 +156,7 @@ def decide(request_id: int, body: Decision, db: Session = Depends(get_db), user=
         if db.query(models.MealPlan).filter(models.MealPlan.user_id == req.user_id, models.MealPlan.status.in_(["active", "pending_payment"]), models.MealPlan.start_date <= end, models.MealPlan.end_date >= req.start_date).first():
             raise HTTPException(400, "Customer already has a subscription for these dates")
         db.add(models.MealPlan(user_id=req.user_id, offer_id=req.offer_id, plan_type=req.offer.name, price=req.offer.price,
-            meal_price=req.offer.meal_price, start_date=req.start_date, end_date=end, status="active"))
+            meal_types=list(included_types(req.offer)), meal_price=req.offer.meal_price, start_date=req.start_date, end_date=end, status="active"))
     req.status = body.status
     db.commit()
     return {"message": f"Request {body.status}"}
@@ -155,7 +165,7 @@ def decide(request_id: int, body: Decision, db: Session = Depends(get_db), user=
 @router.get("/subscriptions/current")
 def current_plan(db: Session = Depends(get_db), user=Depends(customer)):
     return [{"id": p.id, "name": p.plan_type, "price": float(p.price), "meal_price": float(p.meal_price),
-             "start_date": p.start_date, "end_date": p.end_date, "skip_count": p.skip_count or 0} for p in db.query(models.MealPlan).filter(models.MealPlan.user_id == user.id, models.MealPlan.meal_id.is_(None), models.MealPlan.status == "active", models.MealPlan.end_date >= date.today()).order_by(models.MealPlan.start_date).all()]
+             "start_date": p.start_date, "end_date": p.end_date, "skip_count": p.skip_count or 0, "meal_types": included_types(p)} for p in db.query(models.MealPlan).filter(models.MealPlan.user_id == user.id, models.MealPlan.meal_id.is_(None), models.MealPlan.status == "active", models.MealPlan.end_date >= date.today()).order_by(models.MealPlan.start_date).all()]
 
 
 class PauseInput(BaseModel):
@@ -199,12 +209,12 @@ def pause_result(body, db, user, apply=False):
     now = datetime.now(timezone.utc)
     eligible, unchanged = [], []
     for meal in meals:
-        plan = next((p for p in plans if coverage_dates[p.id][0] <= meal.date <= coverage_dates[p.id][1]), None)
+        plan = next((p for p in plans if coverage_dates[p.id][0] <= meal.date <= coverage_dates[p.id][1] and meal.meal_type in included_types(p)), None)
         delivery = db.query(models.DeliveryUpdate).filter_by(user_id=user.id, meal_id=meal.id).first()
         order = db.query(models.MealOrder).filter_by(user_id=user.id, meal_id=meal.id).first()
         reason = None
         if not plan:
-            reason = "Outside subscription dates"
+            reason = "Not included in your subscription"
         elif order and order.status == "skipped":
             reason = "Already skipped"
         elif delivery and delivery.status in ("out_for_delivery", "delivered"):
@@ -270,7 +280,7 @@ def eligible(db: Session = Depends(get_db), user=Depends(customer)):
     reviews = {f.meal_id: f for f in db.query(models.Feedback).filter_by(user_id=user.id).all()}
     meals = db.query(models.Meal).filter(models.Meal.date < date.today(), models.Meal.date >= date.today() - timedelta(days=60)).order_by(models.Meal.date.desc(), models.Meal.cutoff_time.desc(), models.Meal.id.desc()).all()
     def was_eaten(meal):
-        covered = [p for p in plans if p.start_date <= meal.date <= p.end_date and (p.meal_id is None or p.meal_id == meal.id)]
+        covered = [p for p in plans if covers(p, meal)]
         if not covered or meal.id in skipped:
             return False
         delivery = deliveries.get(meal.id)

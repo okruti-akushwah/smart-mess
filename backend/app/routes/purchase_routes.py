@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from app import models
+from app.meal_coverage import covers, included_types
 from app.database import get_db
 from app.routes.discovery_routes import customer
 from app.routes.workflow_routes import bill_output
@@ -36,7 +37,7 @@ def purchase_output(plan, db):
     meal = db.get(models.Meal, plan.meal_id) if plan.meal_id else None
     return {**bill_output(bill, db), "status": plan.status, "offer_id": plan.offer_id,
             "meal_id": plan.meal_id, "name": plan.plan_type,
-            "kind": "meal" if plan.meal_id else "subscription",
+            "kind": "meal" if plan.meal_id else "subscription", "meal_types": included_types(plan),
             "menu": meal.menu_description if meal else None,
             "image_url": meal.image_url if meal else None,
             "meal_type": meal.meal_type if meal else None}
@@ -69,6 +70,8 @@ def checkout(body: CheckoutInput, db: Session = Depends(get_db), user=Depends(cu
         meal = db.get(models.Meal, body.meal_id)
         if not meal:
             raise HTTPException(404, "Meal unavailable")
+        if meal.date != datetime.now(timezone(timedelta(hours=5, minutes=30))).date():
+            raise HTTPException(409, "Single meals can only be ordered from today's menu")
         if meal.date < date.today() or (meal.cutoff_time and meal.cutoff_time.replace(tzinfo=timezone.utc) <= datetime.now(timezone.utc)):
             raise HTTPException(409, "Ordering for this meal has closed")
         if not meal.single_price:
@@ -80,11 +83,11 @@ def checkout(body: CheckoutInput, db: Session = Depends(get_db), user=Depends(cu
     overlaps = db.query(models.MealPlan).filter(models.MealPlan.user_id == user.id,
         models.MealPlan.status.in_(["active", "pending_payment", "pending_acceptance"]),
         models.MealPlan.start_date <= end, models.MealPlan.end_date >= start).all()
-    if any(body.offer_id is not None or p.meal_id is None or p.meal_id == body.meal_id for p in overlaps):
+    if any(body.offer_id is not None or covers(p, meal) for p in overlaps):
         raise HTTPException(409, "You already have a booking or checkout covering these dates. Continue payment from your history.")
     plan = models.MealPlan(user_id=user.id, offer_id=body.offer_id, meal_id=body.meal_id,
         purchase_key=str(body.purchase_key), plan_type=name, price=price, meal_price=deduction,
-        start_date=start, end_date=end, status="pending_payment")
+        start_date=start, end_date=end, meal_types=list(included_types(offer)) if body.offer_id else [meal.meal_type], status="pending_payment")
     try:
         db.add(plan)
         db.flush()
@@ -134,7 +137,7 @@ def activity(db: Session = Depends(get_db), user=Depends(customer)):
     reviewable = {m["id"] for m in eligible(db, user)}
     rows = []
     for meal in db.query(models.Meal).order_by(models.Meal.date.desc(), models.Meal.id.desc()):
-        coverage = next((p for p in active if p.start_date <= meal.date <= p.end_date and (p.meal_id is None or p.meal_id == meal.id)), None)
+        coverage = next((p for p in active if covers(p, meal)), None)
         order, delivery, review = orders.get(meal.id), deliveries.get(meal.id), reviews.get(meal.id)
         if not coverage and not order:
             continue

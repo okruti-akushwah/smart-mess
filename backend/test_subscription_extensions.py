@@ -66,7 +66,7 @@ class SubscriptionExtensionTests(unittest.TestCase):
 
     def test_single_meal_needs_paid_confirmation_and_owner_acceptance(self):
         self.client.put('/delivery/address',headers=self.customer,json={'address':'Flat 12, Test Road, Pune 411001'})
-        meal=self.meal(single_price=120)
+        meal=self.meal(days=0, single_price=120)
         r=self.client.post('/customer/checkout',headers=self.customer,json={'meal_id':meal['id'],'expected_price':120,'purchase_key':str(uuid4())})
         self.assertEqual(r.status_code,201,r.text)
         plan_id,bill=r.json()['plan_id'],r.json()['id']
@@ -75,7 +75,7 @@ class SubscriptionExtensionTests(unittest.TestCase):
         paid=self.client.post('/owner/payments',headers=self.owner,json={'plan_id':plan_id,'amount':120,'receipt_key':str(uuid4()),'reference':'UPI received'})
         self.assertEqual(paid.status_code,201,paid.text)
         self.assertEqual(self.client.get('/owner/personal-orders',headers=self.owner).json()[0]['status'],'pending_acceptance')
-        self.assertEqual(self.client.get('/dashboard/headcount',headers=self.owner).json()['meals'][0]['expected_headcount'],0)
+        self.assertEqual(self.client.get('/dashboard/headcount',headers=self.owner).json()['preparation'][0]['expected_headcount'],0)
         other,_=self.account('9876543299','owner')
         self.assertEqual(self.client.get('/owner/personal-orders',headers=other).json(),[])
         self.assertEqual(self.client.post(f'/owner/personal-orders/{plan_id}/accept',headers=other).status_code,404)

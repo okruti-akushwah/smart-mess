@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Date, ForeignKey, Numeric, Boolean, DateTime, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Date, ForeignKey, Numeric, Boolean, DateTime, UniqueConstraint, JSON
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.database import Base
@@ -18,6 +18,7 @@ class User(Base):
 
 
 class MealPlan(Base):
+    meal_types = Column(JSON, nullable=False, default=lambda: ['breakfast', 'lunch', 'dinner'], server_default='["breakfast", "lunch", "dinner"]')
     __tablename__ = "meal_plans"
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
 
@@ -111,6 +112,7 @@ class Feedback(Base):
 
 
 class PlanOffer(Base):
+    meal_types = Column(JSON, nullable=False, default=lambda: ['breakfast', 'lunch', 'dinner'], server_default='["breakfast", "lunch", "dinner"]')
     __tablename__ = "plan_offers"
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     id = Column(Integer, primary_key=True)

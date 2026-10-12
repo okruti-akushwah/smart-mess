@@ -7,6 +7,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app import models
+from app.meal_coverage import included_types
 from app.database import get_db
 from app.auth import get_current_user
 from app.routes.owner_meal_routes import require_owner
@@ -23,7 +24,7 @@ def bill_output(bill, db):
     paid = sum((p.amount for p in db.query(models.PaymentRecord).filter_by(plan_id=plan.id)), Decimal("0"))
     return {"id": bill.id, "plan_id": plan.id, "created_at": bill.created_at, "seen": bill.seen,
             "start_date": plan.start_date, "end_date": plan.end_date, "name": plan.plan_type,
-            "kind": "meal" if plan.meal_id else "subscription", "status": plan.status,
+            "meal_types": included_types(plan), "kind": "meal" if plan.meal_id else "subscription", "status": plan.status,
             "base_amount": float(bill.base_amount), "deductions": float(bill.deductions),
             "extras_total": float(bill.extras_total), "final_amount": float(bill.final_amount),
             "amount_paid": float(paid), "balance_due": float(max(bill.final_amount-paid, Decimal("0")))}
@@ -68,7 +69,7 @@ def submission_output(s, db):
     bill = db.get(models.IssuedBill, s.bill_id)
     plan = db.get(models.MealPlan, bill.plan_id)
     return {"id": s.id, "bill_id": s.bill_id, "name": user.name, "amount": float(s.amount),
-            "purchase_name": plan.plan_type, "kind": "meal" if plan.meal_id else "subscription",
+            "purchase_name": plan.plan_type, "meal_types": included_types(plan), "kind": "meal" if plan.meal_id else "subscription",
             "method": s.method, "reference": s.reference, "status": s.status,
             "has_image": bool(s.image_name), "created_at": s.created_at}
 

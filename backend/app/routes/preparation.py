@@ -1,9 +1,10 @@
 from datetime import date, datetime, timezone
 from app import models
+from app.meal_coverage import covers
 
 
 def meal_counts(meal, plans, orders):
-    subscriptions = {p.user_id for p in plans if p.meal_id is None and p.start_date <= meal.date <= p.end_date}
+    subscriptions = {p.user_id for p in plans if p.meal_id is None and covers(p, meal)}
     personal = {p.user_id for p in plans if p.meal_id == meal.id}
     actions = [o for o in orders if o.meal_id == meal.id and o.user_id in subscriptions]
     skipped = {o.user_id for o in actions if o.status == "skipped"}
