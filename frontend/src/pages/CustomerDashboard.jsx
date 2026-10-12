@@ -6,6 +6,7 @@ import Navbar from "../components/Navbar";
 import api, { errorMessage } from "../services/api";
 import { localDay } from "../services/dates";
 import MenuImage from "../components/MenuImage";
+import Icon from "../components/Icon";
 
 function closed(meal) {
   const today = new Date();
@@ -24,6 +25,7 @@ export default function CustomerDashboard() {
   const [message, setMessage] = useState("");
   const [guest, setGuest] = useState(null);
   const [guestCount, setGuestCount] = useState(1);
+  const [mealFilter, setMealFilter] = useState('all');
   const guestPrice = guest?.single_price == null ? null : Number(guest.single_price);
   const load = useCallback(async () => {
     try {
@@ -52,7 +54,8 @@ export default function CustomerDashboard() {
   }
   const today = localDay();
   const todayMeals = meals.filter((m) => m.date === today);
-  const upcoming = meals.filter((m) => m.date !== today);
+  const filteredToday = todayMeals.filter(m => mealFilter === 'all' || m.meal_type === mealFilter);
+  const upcoming = meals.filter((m) => m.date !== today && (mealFilter === 'all' || m.meal_type === mealFilter));
   function card(meal) {
     const isClosed = closed(meal);
     return <article className="meal-card" key={meal.id}>
@@ -69,18 +72,17 @@ export default function CustomerDashboard() {
   }
   return <><Navbar title={translate("Dashboard")} /><main className="dashboard">
     <section className="management-card customer-overview">
-      <p className="eyebrow">YOUR MESS · YOUR ACCOUNT</p>
+      <p className="eyebrow">YOUR DAILY TABLE</p>
       <h1>{account?.mess_name || "Your customer dashboard"}</h1>
-      <p>Welcome{account?.customer_name ? `, ${account.customer_name}` : ""}. Manage your meals, subscription and payments here.</p>
-      {account?.address && <p>{account.address}</p>}
-      {account?.contact && <p>Contact: {account.contact}</p>}
+      <p>Welcome{account?.customer_name ? `, ${account.customer_name}` : ""}. Your next good meal starts here.</p>
+      <details><summary>Mess address & contact</summary>{account?.address && <p>{account.address}</p>}{account?.contact && <p>{account.contact}</p>}</details>
       <div className="form-actions"><Link className="btn btn-primary" to="/customer/choose?type=meal">Order a meal</Link><Link className="btn btn-outline" to="/customer/plans/browse">Browse plans</Link><Link className="btn btn-outline" to="/customer/pause">Pause meals</Link><Link className="btn btn-outline" to="/customer/bills">Bills & payments</Link></div>
     </section>
-    {loading ? <div className="loading-card">{translate("Loading today's menu…")}</div> : <section className="today-menu-section"><div className="section-heading"><div><p className="eyebrow">{translate("FRESH FROM THE KITCHEN")}</p><h2>{translate("Today's menu")}</h2></div><button className="btn btn-outline" onClick={load}>{translate("Refresh")}</button></div><div className="meal-grid">{todayMeals.length ? todayMeals.map(card) : <div className="empty-card">{translate("Today's menu hasn't been scheduled yet.")}</div>}</div></section>}
+    <div className="day-switch" aria-label="Filter meal types">{["all", "breakfast", "lunch", "dinner"].map(type => <button key={type} aria-pressed={mealFilter === type} onClick={() => setMealFilter(type)}><Icon name="meal" size={15} /> {translate(type === "all" ? "All meals" : type)}</button>)}</div>{loading ? <div className="loading-card">{translate("Loading today's menu…")}</div> : <section className="today-menu-section"><div className="section-heading"><div><p className="eyebrow">{translate("FRESH FROM THE KITCHEN")}</p><h2>{translate("Today's menu")}</h2></div><button className="btn btn-outline" onClick={load}>{translate("Refresh")}</button></div><div className="meal-grid">{filteredToday.length ? filteredToday.map(card) : <div className="empty-card">{translate("No meals in this selection yet.")}</div>}</div></section>}
     <div className="stats-grid" aria-label="Your account summary">
-      <article className="stat-card"><span>Today's booked meals</span><strong>{loading ? "…" : todayMeals.filter(meal => meal.booked && meal.status !== "skipped").length}</strong><p>Skipped meals are excluded</p></article>
-      <article className="stat-card"><span>Approved subscriptions</span><strong>{loading ? "…" : subscriptions.length}</strong><p>Current and upcoming plans</p></article>
-      <article className="stat-card"><span>Extra subscription days</span><strong>{loading ? "…" : subscriptions.reduce((sum, plan) => sum + (plan.skip_count || 0), 0)}</strong><p>One extra day per skipped meal</p></article>
+      <article className="stat-card"><span className="stat-icon"><Icon name="meal" size={22} /></span><span>Today's booked meals</span><strong>{loading ? "…" : todayMeals.filter(meal => meal.booked && meal.status !== "skipped").length}</strong><p>Skipped meals are excluded</p></article>
+      <article className="stat-card"><span className="stat-icon"><Icon name="check" size={22} /></span><span>Approved subscriptions</span><strong>{loading ? "…" : subscriptions.length}</strong><p>Current and upcoming plans</p></article>
+      <article className="stat-card"><span className="stat-icon"><Icon name="calendar" size={22} /></span><span>Extra subscription days</span><strong>{loading ? "…" : subscriptions.reduce((sum, plan) => sum + (plan.skip_count || 0), 0)}</strong><p>One extra day per skipped meal</p></article>
     </div>
     {!loading && <section className="management-card"><h2>Your subscriptions</h2>{subscriptions.length ? subscriptions.map(plan => <article key={plan.id} className="customer-plan-row"><h3>{plan.name}</h3><p>Includes: {(plan.meal_types || ["breakfast", "lunch", "dinner"]).join(" · ")}</p><p><span className="status-badge">{plan.start_date > today ? "Starts soon" : "Active"}</span> {plan.start_date} to {plan.end_date}</p><p>{plan.skip_count || 0} skipped meals · {plan.skip_count || 0} extra days included in your end date</p></article>) : <p>No active subscription. You can order a single meal or choose a plan.</p>}</section>}
     {!!account?.paused_dates.length && <section className="management-card"><h2>Saved meal pauses</h2><p>{account.paused_dates.join(" · ")}</p><p>Meals published for these dates will also be skipped. Extra days are added when a covered meal is skipped.</p><Link to="/customer/pause">Manage meal pauses</Link></section>}

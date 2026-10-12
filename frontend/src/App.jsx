@@ -49,7 +49,7 @@ function App() {
         <Route path="/owner/login" element={<Login ownerPortal />} />
         <Route path="/owner/register" element={<Signup />} />
         <Route path="/owner/public-page" element={<ProtectedRoute requiredRole="owner"><OwnerPublicPage /></ProtectedRoute>} />
-        {["requests", "plans", "bills", "settings"].map(section => <Route key={section} path={`/owner/${section}`} element={<ProtectedRoute requiredRole="owner"><OwnerWorkspace key={section} section={section} /></ProtectedRoute>} />)}
+        {["requests", "customers", "plans", "bills", "settings"].map(section => <Route key={section} path={`/owner/${section}`} element={<ProtectedRoute requiredRole="owner"><OwnerWorkspace key={section} section={section} /></ProtectedRoute>} />)}
         <Route path="/owner/payments" element={<ProtectedRoute requiredRole="owner"><Payments /></ProtectedRoute>} />
         <Route path="/customer/delivery" element={<Navigate to="/customer" replace />} />
         <Route path="/owner/delivery" element={<Navigate to="/owner" replace />} />

@@ -130,6 +130,9 @@ def skip_meal(
         .first()
     )
 
+    if existing_order and existing_order.status == "guest_added":
+        raise HTTPException(409, "Cannot skip a meal after adding guests")
+
     # User already skipped
     if existing_order and existing_order.status == "skipped":
         raise HTTPException(

@@ -115,7 +115,7 @@ class PurchaseTests(test_app.ApplicationTests):
 
     def test_single_price_required_and_booked_meal_cannot_move_or_delete(self):
         self.address()
-        meal = self.meal(days=0)
+        meal = self.meal(days=0, single_price=None)
         self.assertEqual(self.buy(meal_id=meal['id'], expected_price=100).status_code,409)
         self.assertEqual(self.client.put(f"/owner/meals/{meal['id']}", headers=self.owner, json={'single_price':-2}).status_code,422)
         self.client.put(f"/owner/meals/{meal['id']}", headers=self.owner, json={'single_price':100})

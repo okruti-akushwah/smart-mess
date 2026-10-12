@@ -9,6 +9,8 @@ import { Link, useLocation, Navigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import api, { errorMessage } from "../services/api";
 import { mealStatistics } from "../services/mealStatistics";
+import { localDay } from "../services/dates";
+import Icon from "../components/Icon";
 
 function OwnerDashboard() {
   const translate = useTranslation();
@@ -18,6 +20,7 @@ function OwnerDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [now, setNow] = useState(() => Date.now());
+  const [dayFilter, setDayFilter] = useState('all');
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -59,6 +62,12 @@ function OwnerDashboard() {
 
   const meals = headcount?.preparation || [];
   const latestMeals = headcount?.latest_meals || [];
+  const today = localDay(new Date(now));
+  const lastDay = new Date(now);
+  lastDay.setDate(lastDay.getDate() + 2);
+  const visibleMeals = meals.filter(meal => meal.date >= today && meal.date <= localDay(lastDay));
+  const shownMeals = dayFilter === 'all' ? visibleMeals : visibleMeals.filter(meal => meal.date === dayFilter);
+  const days = [0, 1, 2].map(offset => { const d = new Date(now); d.setDate(d.getDate() + offset); return { date: localDay(d), label: ['Today', 'Tomorrow', 'Day after'][offset] }; });
   const statistics = mealStatistics([...latestMeals, ...meals], now);
   const selectedMeal = statistics.meal;
   const formatTime = time => new Date(time).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
@@ -80,15 +89,15 @@ function OwnerDashboard() {
         </section>}
         <section className="welcome owner-welcome">
           <div>
-            <p className="eyebrow">{translate(" OPERATIONS CENTER ")}
+            <p className="eyebrow">{translate("YOUR KITCHEN · LIVE")}
 
             </p>
 
-            <h1>{translate(" Meal preparation at a glance. ")}
+            <h1>{translate("Good food. Great flow.")}
 
             </h1>
 
-            <p>{translate(" Live customer actions are reflected in your expected meal headcount. ")}
+            <p>{translate("Meals, guests and orders. One clear view.")}
 
 
             </p>
@@ -96,7 +105,7 @@ function OwnerDashboard() {
 
           <button
             className="btn btn-outline"
-            onClick={loadDashboard}>{translate(" Refresh ")}
+            onClick={loadDashboard}><Icon name="refresh" />{translate("Refresh")}
 
 
           </button>
@@ -119,22 +128,25 @@ function OwnerDashboard() {
         <>
             <section className="management-card" aria-label="Current meal statistics">
               <h2>{selectedMeal ? `${translate(selectedMeal.meal_type)} · ${selectedMeal.date}` : "No meal statistics available"}</h2>
-              {selectedMeal ? <><p>{selectedMeal.menu_description}</p><p><strong>{statistics.phase === 'closed' ? 'Cutoff passed · preparation statistics' : 'Next meal · live preview'}</strong></p><p className="muted">{statistics.phase === 'closed' ? `These statistics stay visible for 2 hours after cutoff, until ${formatTime(statistics.switchAt)} (${remainingMinutes} min remaining). After 2 hours, the next meal’s statistics will appear${statistics.next ? `: ${statistics.next.meal_type} · ${statistics.next.date}` : ' when another meal is scheduled'}.` : `Cutoff: ${formatTime(statistics.switchAt)} (${remainingMinutes} min remaining). These counts may change until cutoff. After cutoff, this meal’s statistics remain visible for 2 hours, then switch to the next meal.`}</p></> : <p className="muted">The previous meal’s 2-hour window has ended, or no meals with cutoff times are scheduled. Publish the next meal to see its statistics.</p>}
+              {selectedMeal ? <><p>{selectedMeal.menu_description}</p><p><span className="status-badge">{statistics.phase === 'closed' ? 'Cutoff passed' : 'Live preview'}</span> · {remainingMinutes} min {statistics.phase === 'closed' ? 'until next meal' : 'until cutoff'}</p><details className="timing-note"><summary>{statistics.phase === 'closed' ? 'Next switch' : 'Cutoff'} · {formatTime(statistics.switchAt)}</summary><p>Statistics stay visible for 2 hours after cutoff, then switch to the next meal. {statistics.next ? `Next: ${statistics.next.meal_type} · ${statistics.next.date}.` : ''} Counts update as orders are confirmed.</p></details></> : <p className="muted">No current meal. Publish your next menu to see its counts.</p>}
             <div className="stats-grid" id="owner-overview">
               <StatCard
               label="Expected Meals"
+              icon="meal"
               value={selectedMeal?.expected_headcount ?? "—"}
               description={statistics.phase === 'closed' ? "After cutoff" : "Next meal estimate"} />
             
 
               <StatCard
               label="Confirmed Skips"
+              icon="calendar"
               value={selectedMeal?.skipped_subscribers ?? "—"}
               description="Subscription days added" />
             
 
               <StatCard
               label="Guests"
+              icon="people"
               value={selectedMeal?.guests ?? "—"}
               description="Additional meals" />
             
@@ -148,7 +160,7 @@ function OwnerDashboard() {
 
                 </p>
 
-                  <h2>{translate(" Today's and Upcoming Meals ")}
+                  <h2>{translate("Today and the next 2 days")}
 
                 </h2>
                 </div>
@@ -158,22 +170,23 @@ function OwnerDashboard() {
                 </span>
               </div>
 
+              <div className="day-switch" aria-label="Filter meals by day"><button aria-pressed={dayFilter === 'all'} onClick={() => setDayFilter('all')}>All 3 days</button>{days.map(day => <button key={day.date} aria-pressed={dayFilter === day.date} onClick={() => setDayFilter(day.date)}>{day.label} <span>· {visibleMeals.filter(meal => meal.date === day.date).length}</span></button>)}</div>
               <div className="meal-grid">
-                {meals.length === 0 ?
-              <div className="empty-card">{translate(" No meals scheduled yet. ")}
+                {shownMeals.length === 0 ?
+              <div className="empty-card">{translate("No meals scheduled for today or the next 2 days.")}
 
               </div> :
 
-              meals.map((meal) =>
+              shownMeals.map((meal) =>
               <article
                 className="headcount-card"
                 key={meal.meal_id}>
                 
                       <span className="meal-type">
-                        {translate(meal.meal_type)} · {meal.date}
+                        <Icon name="meal" size={16} />{translate(meal.meal_type)} · {meal.date}
                       </span>
 
-                      <p>{meal.menu_description}</p><p>{meal.changes_closed ? "Cutoff passed · changes closed" : "Live · changes open"}{meal.cutoff_time ? ` · ${new Date(meal.cutoff_time.endsWith("Z") ? meal.cutoff_time : `${meal.cutoff_time}Z`).toLocaleString()}` : ""}</p>
+                      <p>{meal.menu_description}</p><p>{meal.changes_closed ? "Changes closed" : "Open until"}{meal.cutoff_time ? ` · ${new Date(meal.cutoff_time.endsWith("Z") ? meal.cutoff_time : `${meal.cutoff_time}Z`).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : ""}</p>
                       <strong className="big-number">
                         {translate(meal.expected_headcount)}
                       </strong>
@@ -181,6 +194,7 @@ function OwnerDashboard() {
                       <span className="big-number-label">{translate(" expected meals ")}
 
                 </span>
+                      <div className="meal-mix" role="img" aria-label={`${meal.expected_headcount} expected meals: ${meal.personal_orders} personal orders, ${meal.guests} guests, remaining subscription meals`}><span style={{ flex: Math.max(0, meal.expected_headcount - meal.personal_orders - meal.guests) }} /><span style={{ flex: meal.personal_orders || 0 }} /><span style={{ flex: meal.guests || 0 }} /></div>
 
                       <div className="headcount-details"><div><a href="#today-personal-orders" onClick={event => { event.preventDefault(); document.getElementById("today-personal-orders")?.scrollIntoView({ behavior: "smooth", block: "start" }); }} aria-label={`${meal.personal_orders} personal orders — view today's orders`}><span>Personal orders</span><strong>{meal.personal_orders}</strong></a></div>
                         <div>
@@ -224,11 +238,13 @@ function OwnerDashboard() {
 function StatCard({
   label,
   value,
-  description
+  description,
+  icon
 }) {
   const translate = useTranslation();
   return (
     <article className="stat-card">
+      <span className="stat-icon"><Icon name={icon} size={22} /></span>
       <span>{translate(label)}</span>
       <strong>{translate(value)}</strong>
       <p>{translate(description)}</p>

@@ -4,6 +4,7 @@ from app import models, schemas
 from app.database import get_db
 from app.routes.owner_meal_routes import require_owner
 from uuid import uuid4
+from datetime import date
 
 router = APIRouter(prefix="/owner", tags=["subscriptions"])
 
@@ -11,7 +12,23 @@ router = APIRouter(prefix="/owner", tags=["subscriptions"])
 @router.get("/customers")
 def customers(db: Session = Depends(get_db), owner=Depends(require_owner)):
     users = db.query(models.User).filter(models.User.role == "customer").all()
-    return [{"id": u.id, "name": u.name, "phone": u.phone} for u in users]
+    ids = [u.id for u in users]
+    addresses = {a.user_id: a for a in db.query(models.DeliveryProfile).filter(models.DeliveryProfile.user_id.in_(ids)).all()}
+    memberships = {r.user_id: r.status for r in db.query(models.JoinRequest).filter(models.JoinRequest.user_id.in_(ids)).all()}
+    plans = db.query(models.MealPlan).filter(models.MealPlan.user_id.in_(ids),
+        models.MealPlan.meal_id.is_(None), models.MealPlan.status.in_(["active", "pending_payment"]),
+        models.MealPlan.end_date >= date.today()).order_by(models.MealPlan.start_date).all()
+    result = []
+    for user in users:
+        address = addresses.get(user.id)
+        result.append({"id": user.id, "name": user.name, "phone": user.phone,
+            "address": address.address if address else "", "instructions": address.instructions if address else "",
+            "membership_status": memberships.get(user.id, "approved"),
+            "subscriptions": [{"id": p.id, "name": p.plan_type,
+                "status": "awaiting_payment" if p.status == "pending_payment" else "upcoming" if p.start_date > date.today() else "active",
+                "start_date": p.start_date, "end_date": p.end_date, "meal_types": p.meal_types}
+                for p in plans if p.user_id == user.id]})
+    return result
 
 
 @router.post("/plans", status_code=201)

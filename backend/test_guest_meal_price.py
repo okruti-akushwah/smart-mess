@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from app.database import Base
 from app import models, schemas
-from app.routes.meal_routes import add_guest
+from app.routes.meal_routes import add_guest, skip_meal
 
 
 class GuestMealPriceTests(unittest.TestCase):
@@ -27,6 +27,10 @@ class GuestMealPriceTests(unittest.TestCase):
             db.commit()
             add_guest(schemas.AddGuestRequest(meal_id=meals[0].id, guest_count=2, expected_unit_price=120), db, user)
             order = db.query(models.MealOrder).filter_by(meal_id=meals[0].id).one()
+            self.assertEqual(order.extra_cost, Decimal('240'))
+            with self.assertRaises(HTTPException) as skip:
+                skip_meal(schemas.SkipMealRequest(meal_id=meals[0].id), db, user)
+            self.assertEqual(skip.exception.status_code, 409)
             self.assertEqual(order.extra_cost, Decimal('240'))
             meals[0].single_price = 130
             db.commit()

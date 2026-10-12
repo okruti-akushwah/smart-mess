@@ -77,7 +77,7 @@ def checkout(body: CheckoutInput, db: Session = Depends(get_db), user=Depends(cu
         if not meal.single_price:
             raise HTTPException(409, "Your owner has not enabled single-meal ordering for this meal")
         start = end = meal.date
-        price, deduction, name = meal.single_price, Decimal("0"), f"{meal.meal_type.title()} Â· {meal.menu_description}"
+        price, deduction, name = meal.single_price, Decimal("0"), f"{meal.meal_type.title()} · {meal.menu_description}"
     if price != body.expected_price:
         raise HTTPException(409, "Price has changed. Refresh and confirm the new amount")
     overlaps = db.query(models.MealPlan).filter(models.MealPlan.user_id == user.id,

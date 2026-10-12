@@ -42,14 +42,19 @@ class ApplicationTests(unittest.TestCase):
         return {'Authorization': 'Bearer ' + login.json()['access_token']}, user_id
 
     def meal(self, days=1, meal_type='lunch', **extra):
-        body = {'date': (date.today()+timedelta(days=days)).isoformat(), 'meal_type': meal_type, 'menu_description': 'Dal, rice and roti', **extra}
+        body = {'date': (date.today()+timedelta(days=days)).isoformat(), 'meal_type': meal_type, 'menu_description': 'Dal, rice and roti', 'single_price': 50, **extra}
         r = self.client.post('/owner/meals', headers=self.owner, json=body)
         self.assertEqual(r.status_code, 201, r.text)
         return r.json()
 
     def plan(self):
-        r = self.client.post('/owner/plans', headers=self.owner, json={'user_id': self.customer_id, 'price': 3000, 'meal_price': 50, 'start_date': date.today().isoformat(), 'end_date': (date.today()+timedelta(days=31)).isoformat()})
-        self.assertEqual(r.status_code, 201, r.text)
+        # Existing meal/billing tests exercise a legacy active subscription.
+        # New owner assignments and their payment gate have separate regression tests.
+        with self.Session() as db:
+            db.add(models.MealPlan(owner_id=self.owner_id, user_id=self.customer_id,
+                plan_type='monthly', price=3000, meal_price=50, status='active',
+                start_date=date.today(), end_date=date.today()+timedelta(days=31)))
+            db.commit()
 
     def test_auth_validation_and_permissions(self):
         self.assertEqual(self.client.get('/owner/meals').status_code, 401)
@@ -115,7 +120,7 @@ class ApplicationTests(unittest.TestCase):
         self.plan()
         m = self.meal()
         closed = self.meal(meal_type='breakfast', cutoff_time=(datetime.now(timezone.utc)-timedelta(minutes=1)).isoformat())
-        guest = self.meal(meal_type='dinner')
+        guest = self.meal(meal_type='dinner', single_price=75)
         self.assertEqual(self.client.put('/owner/guest-price', headers=self.owner, json={'price':75}).status_code, 200)
         self.client.post('/meals/add-guest', headers=self.customer, json={'meal_id':guest['id'], 'extra_cost':75})
         tomorrow = (date.today()+timedelta(days=1)).isoformat()
@@ -267,7 +272,7 @@ class ApplicationTests(unittest.TestCase):
 
     def test_customer_actions_history_billing_and_headcount(self):
         self.plan()
-        m = self.meal(days=0)
+        m = self.meal(days=0, single_price=75)
         tomorrow = self.meal()
         url = f'/owner/meals/{m["id"]}'
         body = {'meal_id': m['id']}

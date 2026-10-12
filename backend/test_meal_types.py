@@ -20,6 +20,10 @@ class PlanMealTypeTests(unittest.TestCase):
             'start_date': date.today().isoformat(), 'end_date': (date.today()+timedelta(days=30)).isoformat(),
             'meal_types': ['lunch']})
         self.assertEqual(r.status_code, 201, r.text)
+        from uuid import uuid4
+        paid = self.client.post('/owner/payments', headers=self.owner, json={
+            'plan_id': r.json()['id'], 'amount': 1500, 'receipt_key': str(uuid4()), 'reference': 'Confirmed QR payment'})
+        self.assertEqual(paid.status_code, 201, paid.text)
 
     def test_lunch_only_controls_counts_deliveries_and_skips(self):
         self.assign_lunch()

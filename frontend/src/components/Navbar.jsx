@@ -3,7 +3,10 @@ import api from "../services/api";
 import { useTranslation } from "../i18n/useTranslation";
 import BillNotification from "./BillNotification";
 import NotificationSound from "./NotificationSound";
+import Icon from "./Icon";
 import { Link, useNavigate, useLocation } from "react-router-dom";
+
+const navIcon = label => ({ Dashboard: 'home', Customers: 'people', Requests: 'people', Meals: 'meal', 'Order food': 'meal', 'Plans & subscriptions': 'calendar', Subscriptions: 'calendar', 'Pause meals': 'pause', Bills: 'bill', Payments: 'bill', 'Meal history': 'calendar', Reviews: 'star', Settings: 'settings', 'Public page': 'home' }[label] || 'home');
 
 function Navbar({ title = "Dashboard" }) {
   const translate = useTranslation();
@@ -47,10 +50,10 @@ function Navbar({ title = "Dashboard" }) {
       <nav className="nav-links" aria-label={translate("Main navigation")}>
         {role === "owner" ? [
           ["/owner", "Dashboard"], ["/owner/public-page", "Public page"],
-          ["/owner/requests", "Requests"], ["/owner/meals", "Meals"],
+          ["/owner/requests", "Requests"], ["/owner/customers", "Customers"], ["/owner/meals", "Meals"],
           ["/owner/plans", "Plans & subscriptions"], ["/owner/payments", "Payments"],
           ["/owner/bills", "Bills"], ["/owner/settings", "Settings"],
-        ].map(([path, label]) => <Link key={path} to={path} aria-current={location.pathname === path ? "page" : undefined}>{translate(label)}</Link>) : [
+        ].map(([path, label]) => <Link key={path} to={path} aria-current={location.pathname === path ? "page" : undefined}><Icon name={navIcon(label)} size={17} /><span>{translate(label)}</span></Link>) : [
           ["/customer", "Dashboard"],
           ["/customer/choose?type=meal", "Order food"],
           ["/customer/plans", "Subscriptions"],
@@ -58,7 +61,7 @@ function Navbar({ title = "Dashboard" }) {
           ["/customer/history", "Meal history"],
           ["/customer/bills", "Bills"],
           ["/customer/reviews", "Reviews"],
-        ].map(([path, label]) => <Link key={path} to={path} aria-current={location.pathname === path.split("?")[0] ? "page" : undefined}>{translate(label)}</Link>)}
+        ].map(([path, label]) => <Link key={path} to={path} aria-current={location.pathname === path.split("?")[0] ? "page" : undefined}><Icon name={navIcon(label)} size={17} /><span>{translate(label)}</span></Link>)}
       </nav>
 
       <div className="nav-right">

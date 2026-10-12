@@ -4,9 +4,11 @@ import OfferManager from "../components/OfferManager";
 import SubscriptionManager from "../components/SubscriptionManager";
 import BillWorkflow from "../components/BillWorkflow";
 import PaymentOptions from "../components/PaymentOptions";
+import CustomerDirectory from "../components/CustomerDirectory";
 import { useTranslation } from "../i18n/useTranslation";
 
 const sections = {
+  customers: ["Customers", "View your mess members, contact numbers, delivery addresses and subscription status."],
   requests: ["Requests", "Review customer join requests, subscription requests and payment confirmations."],
   plans: ["Plans & subscriptions", "Publish your meal plans and assign customer subscriptions."],
   bills: ["Bills", "Generate customer bills from subscriptions, skips and guest charges."],
@@ -20,6 +22,7 @@ export default function OwnerWorkspace({ section }) {
     <section className="welcome owner-welcome"><div><p className="eyebrow">{translate("YOUR MESS WORKSPACE")}</p><h1>{translate(title)}</h1><p>{translate(description)}</p></div></section>
     {section === "requests" && <><JoinManager /><OfferManager view="requests" /><section id="payment-confirmations" style={{ scrollMarginTop: 180 }}><BillWorkflow owner view="payments" pendingOnly /></section></>}
     {section === "plans" && <><OfferManager view="plans" /><SubscriptionManager /></>}
+    {section === "customers" && <CustomerDirectory />}
     {section === "bills" && <BillWorkflow owner view="bills" />}
     {section === "settings" && <PaymentOptions owner />}
   </main></>;

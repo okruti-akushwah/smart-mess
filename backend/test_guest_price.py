@@ -3,7 +3,7 @@ from app import models
 from decimal import Decimal
 
 class GuestPriceTests(test_app.ApplicationTests):
-    def test_fixed_guest_price_count_bill_and_headcount(self):
+    def test_meal_guest_price_count_bill_and_headcount(self):
         self.plan()
         meal = self.meal()
         self.assertEqual(self.client.get('/meals/guest-price',headers=self.customer).json()['price'],50)
@@ -17,7 +17,7 @@ class GuestPriceTests(test_app.ApplicationTests):
         self.assertEqual(count['expected_headcount'],3)
         self.assertEqual(self.client.put('/owner/guest-price',headers=self.owner,json={'price':75}).status_code,200)
         self.assertEqual(self.client.get('/bills/current',headers=self.customer).json()['extras_total'],100)
-        next_meal=self.meal(meal_type='dinner')
+        next_meal=self.meal(meal_type='dinner', single_price=75)
         body={'meal_id':next_meal['id'],'guest_count':2,'expected_unit_price':50}
         self.assertEqual(self.client.post('/meals/add-guest',headers=self.customer,json=body).status_code,409)
         for count in [0,-1,1.5,101]:
