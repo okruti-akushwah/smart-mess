@@ -3,7 +3,6 @@ import JoinManager from "../components/JoinManager";
 import OfferManager from "../components/OfferManager";
 import SubscriptionManager from "../components/SubscriptionManager";
 import BillWorkflow from "../components/BillWorkflow";
-import GuestPriceEditor from "../components/GuestPriceEditor";
 import PaymentOptions from "../components/PaymentOptions";
 import { useTranslation } from "../i18n/useTranslation";
 
@@ -22,6 +21,6 @@ export default function OwnerWorkspace({ section }) {
     {section === "requests" && <><JoinManager /><OfferManager view="requests" /><section id="payment-confirmations" style={{ scrollMarginTop: 180 }}><BillWorkflow owner view="payments" pendingOnly /></section></>}
     {section === "plans" && <><OfferManager view="plans" /><SubscriptionManager /></>}
     {section === "bills" && <BillWorkflow owner view="bills" />}
-    {section === "settings" && <><GuestPriceEditor /><PaymentOptions owner /></>}
+    {section === "settings" && <PaymentOptions owner />}
   </main></>;
 }

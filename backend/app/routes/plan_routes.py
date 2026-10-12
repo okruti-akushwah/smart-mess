@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app import models, schemas
 from app.database import get_db
 from app.routes.owner_meal_routes import require_owner
+from uuid import uuid4
 
 router = APIRouter(prefix="/owner", tags=["subscriptions"])
 
@@ -20,19 +21,34 @@ def assign_plan(req: schemas.PlanCreate, db: Session = Depends(get_db), owner=De
         raise HTTPException(404, "Customer not found")
     if req.end_date < req.start_date:
         raise HTTPException(422, "End date must be on or after start date")
-    overlap = db.query(models.MealPlan).filter(
+    db.query(models.User).filter_by(id=user.id).with_for_update().first()
+    overlaps = db.query(models.MealPlan).filter(
         models.MealPlan.user_id == req.user_id,
         models.MealPlan.status.in_(["active", "pending_payment", "pending_acceptance"]),
         models.MealPlan.start_date <= req.end_date,
         models.MealPlan.end_date >= req.start_date,
-    ).first()
-    if overlap:
-        raise HTTPException(400, "Customer already has a plan for these dates")
-    plan = models.MealPlan(**req.model_dump(), plan_type="monthly", status="active")
+    ).all()
+    replaceable = []
+    for existing in overlaps:
+        has_receipts = db.query(models.PaymentRecord).filter_by(plan_id=existing.id).first()
+        has_submission = db.query(models.PaymentSubmission).join(models.IssuedBill,
+            models.IssuedBill.id == models.PaymentSubmission.bill_id).filter(
+                models.IssuedBill.plan_id == existing.id, models.PaymentSubmission.status == "pending").first()
+        if existing.status == "pending_payment" and existing.offer_id is None and existing.meal_id is None and not has_receipts and not has_submission:
+            replaceable.append(existing)
+        else:
+            raise HTTPException(400, "Customer already has an active plan or a payment in progress for these dates. Choose dates after it ends.")
+    for existing in replaceable:
+        existing.status = "cancelled"
+    plan = models.MealPlan(**req.model_dump(), plan_type="Owner-assigned subscription", status="pending_payment",
+        purchase_key=str(uuid4()), original_start_date=req.start_date, original_end_date=req.end_date)
     db.add(plan)
+    db.flush()
+    db.add(models.IssuedBill(user_id=user.id, plan_id=plan.id, base_amount=plan.price,
+        deductions=0, extras_total=0, final_amount=plan.price))
     db.commit()
     db.refresh(plan)
-    return {"id": plan.id, "message": "Subscription assigned successfully"}
+    return {"id": plan.id, "status": plan.status, "message": "Subscription assigned awaiting payment. It activates only after full payment is confirmed by the owner."}
 
 @router.post("/customers", response_model=schemas.CustomerCreated, status_code=201)
 def create_customer(req: schemas.CustomerCreate, db: Session = Depends(get_db), owner=Depends(require_owner)):

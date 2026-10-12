@@ -52,7 +52,15 @@ class PurchaseTests(test_app.ApplicationTests):
         self.pay(r.json()['id'], 120)
         order = self.client.get('/owner/personal-orders', headers=self.owner).json()[0]
         self.assertEqual(order['status'], 'pending_acceptance')
+        self.assertEqual(order['address'], 'Flat 12, Test Road, Pune 411001')
+        self.assertTrue(order['customer_name'])
+        self.assertTrue(order['customer_phone'])
+        self.assertEqual(order['quantity'], 1)
+        self.assertEqual(self.client.get('/owner/personal-orders', headers=self.customer).status_code, 403)
         self.assertEqual(self.client.post(f"/owner/personal-orders/{order['plan_id']}/accept", headers=self.owner).status_code, 200)
+        accepted_order = self.client.get('/owner/personal-orders', headers=self.owner).json()[0]
+        self.assertTrue(accepted_order['accepted'])
+        self.assertEqual(accepted_order['address'], order['address'])
         counts = self.client.get('/dashboard/headcount', headers=self.owner).json()['preparation']
         self.assertEqual(next(m for m in counts if m['meal_id'] == lunch['id'])['expected_headcount'], 1)
         self.assertEqual(next(m for m in counts if m['meal_id'] == dinner['id'])['expected_headcount'], 0)

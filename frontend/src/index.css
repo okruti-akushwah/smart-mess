@@ -543,6 +543,22 @@ a:hover {
   gap: 5px;
 }
 
+.headcount-details a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: inherit;
+  text-decoration: none;
+}
+
+.headcount-details a:hover span {
+  text-decoration: underline;
+}
+
+#today-personal-orders {
+  scroll-margin-top: 100px;
+}
+
 .headcount-details span {
   color: #89938d;
   font-size: 11px;

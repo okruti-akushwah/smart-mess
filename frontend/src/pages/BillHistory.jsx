@@ -113,16 +113,16 @@ function BillHistory() {
               } />
             
 
-              <BillStat
+              {Number(currentBill.deductions) > 0 && <BillStat
               label="Historical Skip Deductions"
               value={
               currentBill.deductions
               }
-              prefix="-" />
+              prefix="-" />}
             
 
               <BillStat
-              label="Extras"
+              label="Guest"
               value={
               currentBill.extras_total
               }

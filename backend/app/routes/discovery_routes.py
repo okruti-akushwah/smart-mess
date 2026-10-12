@@ -164,7 +164,7 @@ def decide(request_id: int, body: Decision, db: Session = Depends(get_db), user=
 
 @router.get("/subscriptions/current")
 def current_plan(db: Session = Depends(get_db), user=Depends(customer)):
-    return [{"id": p.id, "name": p.plan_type, "price": float(p.price), "meal_price": float(p.meal_price),
+    return [{"id": p.id, "offer_id": p.offer_id, "name": p.plan_type, "price": float(p.price), "meal_price": float(p.meal_price),
              "start_date": p.start_date, "end_date": p.end_date, "skip_count": p.skip_count or 0, "meal_types": included_types(p)} for p in db.query(models.MealPlan).filter(models.MealPlan.user_id == user.id, models.MealPlan.meal_id.is_(None), models.MealPlan.status == "active", models.MealPlan.end_date >= date.today()).order_by(models.MealPlan.start_date).all()]
 
 

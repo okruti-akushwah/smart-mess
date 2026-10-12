@@ -266,7 +266,9 @@ def add_guest(
             detail="Guest already added for this meal"
         )
 
-    unit_price = guest_price(db)
+    if meal.single_price is None or meal.single_price <= 0:
+        raise HTTPException(409, "Guest booking is unavailable until the owner sets this meal's single-meal price.")
+    unit_price = meal.single_price
     if req.expected_unit_price is not None and Decimal(str(req.expected_unit_price)) != unit_price:
         raise HTTPException(409, "Guest price has changed. Refresh the page and confirm the new total.")
     total = unit_price * req.guest_count

@@ -8,6 +8,7 @@ import { Link, useLocation, Navigate } from "react-router-dom";
 
 import Navbar from "../components/Navbar";
 import api, { errorMessage } from "../services/api";
+import { mealStatistics } from "../services/mealStatistics";
 
 function OwnerDashboard() {
   const translate = useTranslation();
@@ -16,6 +17,12 @@ function OwnerDashboard() {
   const [publicProfile, setPublicProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const loadDashboard = useCallback(async () => {
 
@@ -52,28 +59,12 @@ function OwnerDashboard() {
 
   const meals = headcount?.preparation || [];
   const latestMeals = headcount?.latest_meals || [];
-  const today = new Date().toLocaleDateString("en-CA");
-  const todayMeals = meals.filter(meal => meal.date === today);
+  const statistics = mealStatistics([...latestMeals, ...meals], now);
+  const selectedMeal = statistics.meal;
+  const formatTime = time => new Date(time).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  const remainingMinutes = Math.max(0, Math.ceil((statistics.switchAt - now) / 60000));
   const publicPageReady = publicProfile?.address?.trim() && publicProfile?.contact?.trim()
     && (publicProfile?.hours?.trim() || publicProfile?.timings?.length);
-
-  const totalExpected = todayMeals.reduce(
-    (total, meal) =>
-    total + (meal.expected_headcount || 0),
-    0
-  );
-
-  const totalSkips = todayMeals.reduce(
-    (total, meal) =>
-    total + (meal.skipped_subscribers || 0),
-    0
-  );
-
-  const totalGuests = todayMeals.reduce(
-    (total, meal) =>
-    total + (meal.guests || 0),
-    0
-  );
 
   const legacyTabs = { "#mess-settings": "/owner/settings", "#customer-requests": "/owner/requests", "#subscription-plans": "/owner/plans", "#owner-plan-requests": "/owner/requests" };
   if (legacyTabs[hash]) return <Navigate to={legacyTabs[hash]} replace />;
@@ -126,25 +117,29 @@ function OwnerDashboard() {
         </div> :
 
         <>
+            <section className="management-card" aria-label="Current meal statistics">
+              <h2>{selectedMeal ? `${translate(selectedMeal.meal_type)} · ${selectedMeal.date}` : "No meal statistics available"}</h2>
+              {selectedMeal ? <><p>{selectedMeal.menu_description}</p><p><strong>{statistics.phase === 'closed' ? 'Cutoff passed · preparation statistics' : 'Next meal · live preview'}</strong></p><p className="muted">{statistics.phase === 'closed' ? `These statistics stay visible for 2 hours after cutoff, until ${formatTime(statistics.switchAt)} (${remainingMinutes} min remaining). After 2 hours, the next meal’s statistics will appear${statistics.next ? `: ${statistics.next.meal_type} · ${statistics.next.date}` : ' when another meal is scheduled'}.` : `Cutoff: ${formatTime(statistics.switchAt)} (${remainingMinutes} min remaining). These counts may change until cutoff. After cutoff, this meal’s statistics remain visible for 2 hours, then switch to the next meal.`}</p></> : <p className="muted">The previous meal’s 2-hour window has ended, or no meals with cutoff times are scheduled. Publish the next meal to see its statistics.</p>}
             <div className="stats-grid" id="owner-overview">
               <StatCard
               label="Expected Meals"
-              value={totalExpected}
-              description="Today" />
+              value={selectedMeal?.expected_headcount ?? "—"}
+              description={statistics.phase === 'closed' ? "After cutoff" : "Next meal estimate"} />
             
 
               <StatCard
               label="Confirmed Skips"
-              value={totalSkips}
+              value={selectedMeal?.skipped_subscribers ?? "—"}
               description="Subscription days added" />
             
 
               <StatCard
               label="Guests"
-              value={totalGuests}
+              value={selectedMeal?.guests ?? "—"}
               description="Additional meals" />
             
             </div>
+            </section>
 
             <section>
               <div className="section-heading">
@@ -187,7 +182,7 @@ function OwnerDashboard() {
 
                 </span>
 
-                      <div className="headcount-details"><div><span>Personal orders</span><strong>{meal.personal_orders}</strong></div>
+                      <div className="headcount-details"><div><a href="#today-personal-orders" onClick={event => { event.preventDefault(); document.getElementById("today-personal-orders")?.scrollIntoView({ behavior: "smooth", block: "start" }); }} aria-label={`${meal.personal_orders} personal orders — view today's orders`}><span>Personal orders</span><strong>{meal.personal_orders}</strong></a></div>
                         <div>
                           <span>{translate("Subscriptions")}</span>
                           <strong>

@@ -2,10 +2,12 @@ import { useTranslation } from "../i18n/useTranslation";
 import { useEffect, useState } from "react";
 import api, { errorMessage } from "../services/api";
 
+const emptyForm = () => ({ user_id: "", price: "", meal_price: 50, meal_types: [], start_date: "", end_date: "" });
+
 export default function SubscriptionManager() {
   const translate = useTranslation();
   const [customers, setCustomers] = useState([]);
-  const [form, setForm] = useState({ user_id: "", price: 3000, meal_price: 50, meal_types: ["breakfast", "lunch", "dinner"], start_date: "", end_date: "" });
+  const [form, setForm] = useState(emptyForm);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -17,7 +19,8 @@ export default function SubscriptionManager() {
     setSaving(true);setError("");setMessage("");
     try {
       await api.post("/owner/plans", { ...form, user_id: Number(form.user_id), price: Number(form.price), meal_price: Number(form.meal_price) });
-      setMessage("Subscription assigned. Customer billing and kitchen headcount are now active.");
+      setForm(emptyForm());
+      setMessage("Subscription assigned awaiting payment. The customer can pay from Bills; meal bookings begin only after you confirm full payment.");
       window.dispatchEvent(new Event("subscription-updated"));
     } catch (e) {setError(errorMessage(e));} finally
     {setSaving(false);}
@@ -25,7 +28,7 @@ export default function SubscriptionManager() {
   function change(event) {setForm({ ...form, [event.target.name]: event.target.value });}
   return <section className="management-card">
     <p className="eyebrow">{translate("CUSTOMER SUBSCRIPTIONS")}</p><h2>{translate("Set up a meal plan")}</h2>
-    <p className="muted">{translate("Assign a subscription to a registered customer to activate their billing and include them in preparation counts.")}</p>
+    <p className="muted">Assign a subscription and create its payment bill. It counts as taken and enters preparation totals only after you confirm full payment. A new assignment replaces an overlapping unpaid owner assignment when no payment is awaiting confirmation.</p>
     {error && <div className="alert error" role="alert">{translate(error)}</div>}
     {message && <div className="alert success" role="status">{translate(message)}</div>}
     {!customers.length ? <p>{translate("No customers yet. Share your mess join link, then approve their requests in the Requests tab.")}</p> :

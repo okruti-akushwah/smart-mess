@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import api from "../services/api";
 import { useTranslation } from "../i18n/useTranslation";
 import BillNotification from "./BillNotification";
+import NotificationSound from "./NotificationSound";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 
 function Navbar({ title = "Dashboard" }) {
@@ -48,7 +49,7 @@ function Navbar({ title = "Dashboard" }) {
           ["/owner", "Dashboard"], ["/owner/public-page", "Public page"],
           ["/owner/requests", "Requests"], ["/owner/meals", "Meals"],
           ["/owner/plans", "Plans & subscriptions"], ["/owner/payments", "Payments"],
-          ["/owner/bills", "Bills"], ["/owner/delivery", "Deliveries"], ["/owner/settings", "Settings"],
+          ["/owner/bills", "Bills"], ["/owner/settings", "Settings"],
         ].map(([path, label]) => <Link key={path} to={path} aria-current={location.pathname === path ? "page" : undefined}>{translate(label)}</Link>) : [
           ["/customer", "Dashboard"],
           ["/customer/choose?type=meal", "Order food"],
@@ -61,6 +62,7 @@ function Navbar({ title = "Dashboard" }) {
       </nav>
 
       <div className="nav-right">
+        <NotificationSound role={role} />
         {role === "customer" && <BillNotification />}
         <span className="nav-page">
           {translate(title)}

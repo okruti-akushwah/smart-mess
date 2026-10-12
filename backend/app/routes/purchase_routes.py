@@ -161,8 +161,17 @@ def personal_orders(db: Session = Depends(get_db), owner=Depends(require_owner))
     plans = db.query(models.MealPlan).filter(models.MealPlan.meal_id.is_not(None),
         models.MealPlan.status.in_(["pending_payment", "pending_acceptance", "active"])
     ).order_by(models.MealPlan.id.desc()).all()
-    return [{**purchase_output(p, db), "customer_name": db.get(models.User, p.user_id).name,
-             "accepted": p.accepted} for p in plans]
+    customers = {u.id: u for u in db.query(models.User).filter(models.User.id.in_({p.user_id for p in plans})).all()}
+    addresses = {a.user_id: a for a in db.query(models.DeliveryProfile).filter(models.DeliveryProfile.user_id.in_(customers)).all()}
+    result = []
+    for p in plans:
+        user = customers[p.user_id]
+        address = addresses.get(p.user_id)
+        result.append({**purchase_output(p, db), "customer_name": user.name,
+            "customer_phone": user.phone, "address": address.address if address else "",
+            "instructions": address.instructions if address else "", "quantity": 1,
+            "accepted": p.accepted})
+    return result
 
 
 @router.post("/owner/personal-orders/{plan_id}/accept")

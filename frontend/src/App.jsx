@@ -19,7 +19,6 @@ import MessPublic from "./pages/MessPublic";
 import Explore from "./pages/Explore";
 import MyPlans from "./pages/MyPlans";
 import Reviews from "./pages/Reviews";
-import Delivery from "./pages/Delivery";
 import Payments from "./pages/Payments";
 
 import CustomerDashboard
@@ -52,8 +51,8 @@ function App() {
         <Route path="/owner/public-page" element={<ProtectedRoute requiredRole="owner"><OwnerPublicPage /></ProtectedRoute>} />
         {["requests", "plans", "bills", "settings"].map(section => <Route key={section} path={`/owner/${section}`} element={<ProtectedRoute requiredRole="owner"><OwnerWorkspace key={section} section={section} /></ProtectedRoute>} />)}
         <Route path="/owner/payments" element={<ProtectedRoute requiredRole="owner"><Payments /></ProtectedRoute>} />
-        <Route path="/customer/delivery" element={<ProtectedRoute requiredRole="customer"><Delivery /></ProtectedRoute>} />
-        <Route path="/owner/delivery" element={<ProtectedRoute requiredRole="owner"><Delivery /></ProtectedRoute>} />
+        <Route path="/customer/delivery" element={<Navigate to="/customer" replace />} />
+        <Route path="/owner/delivery" element={<Navigate to="/owner" replace />} />
         <Route path="/explore" element={<Explore />} />
         <Route path="/customer/pause" element={<ProtectedRoute requiredRole="customer"><CustomerPause /></ProtectedRoute>} />
         <Route path="/customer/plans/browse" element={<ProtectedRoute requiredRole="customer"><ChooseFood key="subscription-catalog" subscriptionsOnly /></ProtectedRoute>} />

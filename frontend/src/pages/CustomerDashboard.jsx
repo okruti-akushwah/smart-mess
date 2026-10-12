@@ -5,7 +5,6 @@ import { useCallback, useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import api, { errorMessage } from "../services/api";
 import { localDay } from "../services/dates";
-import { pendingBalance } from "../services/billing";
 import MenuImage from "../components/MenuImage";
 
 function closed(meal) {
@@ -19,31 +18,24 @@ export default function CustomerDashboard() {
   const [meals, setMeals] = useState([]);
   const [subscriptions, setSubscriptions] = useState([]);
   const [account, setAccount] = useState(null);
-  const [balance, setBalance] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [guest, setGuest] = useState(null);
   const [guestCount, setGuestCount] = useState(1);
-  const [guestPrice, setGuestPrice] = useState(null);
+  const guestPrice = guest?.single_price == null ? null : Number(guest.single_price);
   const load = useCallback(async () => {
     try {
       const results = await Promise.allSettled([
         api.get("/meals/upcoming"), api.get("/subscriptions/current"),
-        api.get("/meals/guest-price"), api.get("/customer/account"),
-        api.get("/bills/issued"), api.get("/bills/current"),
+        api.get("/customer/account"),
       ]);
-      const [mealResult, planResult, priceResult, accountResult, billsResult, currentResult] = results;
+      const [mealResult, planResult, accountResult] = results;
       if (mealResult.status === "fulfilled") setMeals(mealResult.value.data);
       if (planResult.status === "fulfilled") setSubscriptions(planResult.value.data);
-      setGuestPrice(priceResult.status === "fulfilled" ? priceResult.value.data.price : null);
       if (accountResult.status === "fulfilled") setAccount(accountResult.value.data);
-      const noCurrent = currentResult.status === "rejected" && currentResult.reason.response?.status === 404;
-      if (billsResult.status === "fulfilled" && (currentResult.status === "fulfilled" || noCurrent)) {
-        setBalance(pendingBalance(billsResult.value.data, noCurrent ? null : currentResult.value.data));
-      } else setBalance(null);
-      const failed = results.find((result, index) => result.status === "rejected" && !(index === 5 && noCurrent));
+      const failed = results.find(result => result.status === "rejected");
       if (failed) throw failed.reason;
       setError("");
     } catch (e) {setError(errorMessage(e, "Unable to load your dashboard."));} finally
@@ -70,8 +62,8 @@ export default function CustomerDashboard() {
       <p>{translate(new Date(`${meal.date}T00:00:00`).toLocaleDateString(translate.locale, { weekday: "short", day: "numeric", month: "short" }))} · {translate(isClosed ? "Changes closed" : "Changes open")}</p>
       {meal.cutoff_time && <p>{translate("Cutoff: ")}{translate(new Date(/[Z]|[+-]\d\d:\d\d$/.test(meal.cutoff_time) ? meal.cutoff_time : `${meal.cutoff_time}Z`).toLocaleString(translate.locale))}</p>}
       {meal.can_manage ? <div className="meal-actions">
-        <button className="btn btn-danger-soft" disabled={isClosed || busy !== null} onClick={() => action(meal, meal.status === "skipped" ? "undo-skip" : "skip")}>{translate(busy === meal.id ? "Saving…" : meal.status === "skipped" ? "Undo skip" : "Skip meal")}</button>
-        <button className="btn btn-outline" disabled={isClosed || busy !== null || guestPrice === null || meal.status === "guest_added" || meal.status === "skipped"} onClick={() => {setGuest(meal);setGuestCount(1);}}>{translate("+ Guest")}</button>
+        <button className="btn btn-danger-soft" disabled={isClosed || busy !== null || meal.status === "guest_added"} title={meal.status === "guest_added" ? "Skipping is unavailable after adding guests" : undefined} onClick={() => action(meal, meal.status === "skipped" ? "undo-skip" : "skip")}>{translate(busy === meal.id ? "Saving…" : meal.status === "skipped" ? "Undo skip" : "Skip meal")}</button>
+        <button className="btn btn-outline" title={!meal.single_price ? "Owner must set a single-meal price first" : `₹${meal.single_price} per guest`} disabled={isClosed || busy !== null || !meal.single_price || meal.status === "guest_added" || meal.status === "skipped"} onClick={() => {setGuest(meal);setGuestCount(1);}}>{translate("+ Guest")}</button>
       </div> : <div className="meal-actions">{meal.booked ? <span className="status-badge">Single meal booked</span> : meal.date === today ? <Link className="btn btn-primary" to="/customer/choose?type=meal">Order a meal</Link> : <span className="status-badge">Not included in your subscription</span>}</div>}
     </article>;
   }
@@ -89,7 +81,6 @@ export default function CustomerDashboard() {
       <article className="stat-card"><span>Today's booked meals</span><strong>{loading ? "…" : todayMeals.filter(meal => meal.booked && meal.status !== "skipped").length}</strong><p>Skipped meals are excluded</p></article>
       <article className="stat-card"><span>Approved subscriptions</span><strong>{loading ? "…" : subscriptions.length}</strong><p>Current and upcoming plans</p></article>
       <article className="stat-card"><span>Extra subscription days</span><strong>{loading ? "…" : subscriptions.reduce((sum, plan) => sum + (plan.skip_count || 0), 0)}</strong><p>One extra day per skipped meal</p></article>
-      <article className="stat-card"><span>Payment balance</span><strong>{balance === null ? "—" : `₹${balance.toFixed(2)}`}</strong><p><Link to="/customer/bills">View bills and payment status</Link></p></article>
     </div>
     {!loading && <section className="management-card"><h2>Your subscriptions</h2>{subscriptions.length ? subscriptions.map(plan => <article key={plan.id} className="customer-plan-row"><h3>{plan.name}</h3><p>Includes: {(plan.meal_types || ["breakfast", "lunch", "dinner"]).join(" · ")}</p><p><span className="status-badge">{plan.start_date > today ? "Starts soon" : "Active"}</span> {plan.start_date} to {plan.end_date}</p><p>{plan.skip_count || 0} skipped meals · {plan.skip_count || 0} extra days included in your end date</p></article>) : <p>No active subscription. You can order a single meal or choose a plan.</p>}</section>}
     {!!account?.paused_dates.length && <section className="management-card"><h2>Saved meal pauses</h2><p>{account.paused_dates.join(" · ")}</p><p>Meals published for these dates will also be skipped. Extra days are added when a covered meal is skipped.</p><Link to="/customer/pause">Manage meal pauses</Link></section>}
