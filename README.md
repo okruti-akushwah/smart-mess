@@ -12,13 +12,17 @@ Backend:
 ```powershell
 $env:DATABASE_URL = 'sqlite:///./preview.db'
 $env:SECRET_KEY = 'local-preview-session-secret'
+$env:APP_ENV = 'development'
+# Inspect and back up an existing preview before its first adoption.
+backend/.runtime/Scripts/python.exe backend/migrate_database.py status
+backend/.runtime/Scripts/python.exe backend/migrate_database.py upgrade --allow-legacy-upgrade
 backend/.runtime/Scripts/python.exe -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8001
 ```
 
 Frontend:
 ```powershell
 cd frontend
-$env:VITE_API_URL = 'http://127.0.0.1:8001'
+$env:API_PROXY_TARGET = 'http://127.0.0.1:8001'
 npm run dev -- --host 127.0.0.1
 ```
 
@@ -41,14 +45,18 @@ cd frontend
 npm run lint
 npm run build
 ```
-Backend tests use isolated in-memory databases and never touch PostgreSQL.
+Backend tests use isolated in-memory databases by default. Use
+`backend/.runtime/Scripts/python.exe backend/run_tests.py` for the complete isolated
+suite. PostgreSQL fixtures require an explicitly selected, dedicated test database;
+see LIVE_DEPLOYMENT.md. API import never migrates a database. Run the explicit
+migration command before starting a fresh or newly upgraded backend.
 
 ## Your configured backend
-For your real configured database, omit the preview environment variables and start the app from backend with `./.runtime/Scripts/python.exe -m uvicorn app.main:app --reload`. The app reads backend/.env. The frontend defaults to port 8000 when VITE_API_URL is absent. A missing DATABASE_URL falls back to a local SQLite database. Set a persistent SECRET_KEY before using multiple workers or restarting with persistent logins.
+For your real configured database, omit the preview environment variables and start the app from backend with `./.runtime/Scripts/python.exe -m uvicorn app.main:app --reload`. The app reads backend/.env. The frontend defaults to /api, which Vite proxies to port 8000. Set API_PROXY_TARGET=http://127.0.0.1:8001 when using the isolated preview backend. A missing DATABASE_URL falls back to a local SQLite database. Set a persistent SECRET_KEY before using multiple workers or restarting with persistent logins.
 
 The app supports multiple independent messes. Owners register at `/owner/register` and sign in at `/owner/login`. Each owner receives a unique public page and customer join link with a QR code. Customers choose a mess from the homepage or use that mess's link, select one of its published plans, and wait for that owner to approve them. A phone number identifies one account; a customer account belongs to one mess.
 
-Menus, plans, customers, billing, payments, deliveries, reviews and settings are scoped to the owning mess in backend database sessions. Public catalogues accept a `mess_token`; authenticated catalogues use the account's stored membership. Restart the backend after updating: startup adds ownership columns and assigns existing data to the original mess while preserving account IDs, passwords, join links and historical records. No data reset or reseeding is needed.
+Menus, plans, customers, billing, payments, deliveries, reviews and settings are scoped to the owning mess in backend database sessions. Public catalogues accept a `mess_token`; authenticated catalogues use the account's stored membership. Before restarting an updated backend, inspect and apply the explicit migrations as described in LIVE_DEPLOYMENT.md. Ownership backfills preserve account IDs, passwords, join links and historical records. No data reset or reseeding is needed.
 
 Food photographs illustrate menus. Customers pay the owner directly. Owner-entered receipts track received payments and outstanding balances. The app does not collect money through a payment gateway, automatically finalize bills, offer courier GPS tracking or implement an AI forecast.
 
@@ -58,7 +66,7 @@ Owners can open Payments to upload their own PNG/JPEG payment QR (up to 5 MB), s
 
 The homepage and /explore load published menus, plan offers and real subscriber reviews from the backend. No pricing is invented: owners publish their own trial (1 day), weekly (7 days), monthly or custom-duration plans. Regular, mini, protein and special are descriptive categories; each approved subscription covers all scheduled meal types within its dates.
 
-Owners publish offers from their dashboard. Customers open Plans & pause, choose a plan and start date, and submit a request. Owner approval creates the subscription, activating billing and headcounts. Pending requests can be cancelled. Overlapping subscriptions and duplicate pending requests are blocked.
+Owners publish offers from their dashboard. Customers open Plans & pause, choose a plan and start date, and submit a request. Owner approval creates a bill; the subscription activates only after the owner confirms full payment. Pending requests can be cancelled. Overlapping subscriptions and duplicate pending requests are blocked.
 
 Plans & pause can skip already-published meals across a date range. Closed, dispatched, guest-booked, already-skipped and out-of-plan meals remain unchanged. The subscription end date is unchanged and future menus published after the pause are not automatically skipped. Individual skips can be undone before cutoff.
 
@@ -68,7 +76,7 @@ Customers save delivery addresses under Delivery. Owners see today's subscribed,
 
 Owners use Payments to record money they actually received. Receipt keys prevent duplicate recording on retries. Customers see receipts in Bills and paid/balance/credit amounts on their dashboard. If later skips create credit, settle it directly with the owner.
 
-New tables are added on backend startup. Existing databases also receive image_url and meal_price additions without replacing their existing rows. Legacy skip deductions default to ₹50; owners choose their own deduction for new subscriptions. Install backend/requirements.txt to include the PostgreSQL drivers if using your configured database.
+The explicit migration command adds new tables and legacy image_url and meal_price fields without replacing existing rows. API startup only checks the schema. Legacy skip deductions default to ₹50; owners choose their own deduction for new subscriptions. Install backend/requirements.txt to include the PostgreSQL drivers if using your configured database.
 
 Feature checks: publish a weekly offer → request it as a customer → approve as owner → verify the subscription and bill. Pause tomorrow's published meals and check the headcount. Save a delivery address → dispatch today's meal → verify the customer's status and blocked skips. Record a partial direct payment → verify the receipt and reduced balance. Rate an eligible past meal → verify its public review. Automated tests also cover authorization, privacy, cutoff handling and duplicate receipts.
 
@@ -88,7 +96,7 @@ Tests mock the image provider; live generation remains unverified until a key is
 5. Customer receives an in-app notification (refreshes every 15 seconds while logged in). Open Bills, view the generated bill, scan the owner's QR externally, then submit the paid screenshot and amount. For cash, hand it to the owner and submit a cash payment.
 6. Owner Payments: view the screenshot, then Confirm received or Reject. Approval creates one receipt and updates the balance. Rejected submissions can be sent again. Notifications are in-app only.
 
-Payment screenshots are private authenticated files stored in backend/payment_proofs; preserve that folder with the database. New workflow tables are created on API startup. Restart an existing backend to load the changes.
+Payment screenshots are private authenticated files stored in backend/payment_proofs; preserve that folder with the database. Apply the explicit migrations before restarting an existing backend to load new workflow tables.
 
 Workflow integration test (isolated SQLite):
 ```powershell
@@ -106,9 +114,9 @@ Open the owner dashboard → Join my mess. Copy the reusable join link or downlo
 
 For testing on this PC: http://127.0.0.1:5173. For phones on the same Wi-Fi, run Vite with --host 0.0.0.0, and open http://192.168.68.121:5173 (this PC's current Wi-Fi address; it may change). Set Website address for this QR to that network address before downloading. Both devices must be on the same Wi-Fi and Windows Firewall must allow the dev server. No firewall settings are changed by this app. The QR is generated locally, without sending customer data to an external QR service.
 
-The frontend now defaults to /api. Vite proxies /api to http://127.0.0.1:8001; override API_PROXY_TARGET for a different backend. For deployed builds, configure a reverse proxy for /api or set VITE_API_URL when building. Each mess has its own invite approval queue, menus, subscriptions and payment settings.
+The frontend now defaults to /api. Vite proxies /api to http://127.0.0.1:8000; set API_PROXY_TARGET=http://127.0.0.1:8001 for the isolated preview backend. For deployed builds, configure a reverse proxy for /api or set VITE_API_URL when building. Each mess has its own invite approval queue, menus, subscriptions and payment settings.
 
-New join tables are created on backend restart. Existing accounts and manual registration continue to work. Integration check:
+New join tables are managed by explicit migrations before backend restart. Existing accounts and manual registration continue to work. Integration check:
 ```powershell
 $env:PYTHONPATH='backend'
 backend/.runtime/Scripts/python.exe -m unittest test_join.JoinTests.test_join_approval_and_access
@@ -122,7 +130,7 @@ Join my mess now links its QR to /mess/{token}. Visitors browse the public mess 
 ## Owner workflow improvements
 The homepage now prefers the configured mess profile rather than a seeded demo owner. Existing QR links stay owner-specific, so share the QR from the actual owner's dashboard. Pending join and subscription counts appear near the top of the owner dashboard and refresh every five seconds and when the window regains focus. One earlier request misrouted to the demo owner in preview.db was moved to the only configured real owner; its prior routing is recorded in output/request-routing-repair.json.
 
-Customers create their account and verify their phone on the join form without choosing a subscription. The owner approves membership. After login and address setup, customers choose a subscription or single meal through Order food and complete payment for owner confirmation. Legacy join requests that already include a plan retain their existing approval behaviour. Manual customer registration is removed from the dashboard; owner subscription assignment remains in Plans & subscriptions.
+Customers create their account and verify their phone on the join form without choosing a subscription. The owner approves membership. After login and address setup, customers choose a subscription or single meal through Order food and complete payment for owner confirmation. Legacy join requests that already include a plan require owner-confirmed full payment before the subscription activates. Manual customer registration is removed from the dashboard; owner subscription assignment remains in Plans & subscriptions.
 
 Public details are greyed out after saving and on subsequent visits. A pencil unlocks only the corresponding field. Meal timings use separate breakfast/lunch/dinner From/To dropdowns with 15-minute choices. Old text timings remain visible until replaced with structured timings.
 

@@ -3,6 +3,26 @@ import test_app
 from app import models
 
 class PublicProfileTests(test_app.ApplicationTests):
+    def test_business_details_saved_public_and_isolated(self):
+        payload = {'name': 'Test kitchen', 'owner_name': 'Public owner',
+            'business_type': 'Home-style tiffin', 'tagline': 'Fresh daily',
+            'food_type': 'Vegetarian', 'service_type': 'Lunch and dinner',
+            'operating_days': 'Monday to Saturday', 'opening_time': '07:00',
+            'closing_time': '22:00', 'city': 'Jaipur', 'area': 'Mansarovar',
+            'fssai_number': '12345678901234', 'business_status': 'Active'}
+        saved = self.client.put('/owner/mess-profile', headers=self.owner, json=payload)
+        self.assertEqual(saved.status_code, 200, saved.text)
+        public = self.client.get('/public/mess/' + saved.json()['join_token']).json()
+        for field, value in payload.items():
+            self.assertEqual(public[field], value)
+        other, _ = self.account('9876543290', 'owner')
+        other_profile = self.client.get('/owner/mess-profile', headers=other).json()
+        self.assertEqual(other_profile['fssai_number'], '')
+        updated = self.client.put('/owner/mess-profile', headers=self.owner, json={'name': 'New name'})
+        self.assertEqual(updated.json()['fssai_number'], payload['fssai_number'])
+        for bad in ({'fssai_number': '123'}, {'opening_time': '25:00'}, {'business_status': 'Invalid'}):
+            self.assertEqual(self.client.put('/owner/mess-profile', headers=self.owner, json=bad).status_code, 422)
+
     def test_public_details_menu_and_join_destination(self):
         token=self.client.get('/owner/join-link',headers=self.owner).json()['token']
         initial=self.client.get('/public/mess')

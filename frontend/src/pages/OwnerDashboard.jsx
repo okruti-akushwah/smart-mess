@@ -83,10 +83,10 @@ function OwnerDashboard() {
       <Navbar title={translate("Owner Dashboard")} />
 
       <main className="dashboard owner-dashboard">
-        {publicProfile && !publicPageReady && <section className="owner-public-start">
-          <div><p className="eyebrow">{translate("START HERE · STEP 1")}</p><h2>{translate("Set up your public mess page")}</h2><p>{translate("Help customers find your mess. Add your address, contact details and meal timings before sharing your join link.")}</p></div>
-          <Link className="btn btn-primary" to="/owner/public-page">{translate("Set up public page")} <span aria-hidden="true">↗</span></Link>
-        </section>}
+        <section className="owner-public-start owner-onboarding-start">
+          <div><p className="eyebrow">{translate(publicPageReady ? "OWNER SETUP GUIDE" : "START HERE · OWNER SETUP")}</p><h2>{translate("Set up your mess, one step at a time")}</h2><p>{translate("Answer a few simple setup questions to prepare your public page, weekly menu, plans and payments, then invite members.")}</p></div>
+          <Link className="btn btn-primary" to="/owner/onboarding">{translate("Continue setup")} <span aria-hidden="true">↗</span></Link>
+        </section>
         <section className="welcome owner-welcome">
           <div>
             <p className="eyebrow">{translate("YOUR KITCHEN · LIVE")}
@@ -103,12 +103,6 @@ function OwnerDashboard() {
             </p>
           </div>
 
-          <button
-            className="btn btn-outline"
-            onClick={loadDashboard}><Icon name="refresh" />{translate("Refresh")}
-
-
-          </button>
         </section>
 
         {error &&

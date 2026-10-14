@@ -8,7 +8,7 @@ from typing import Optional
 class UserCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     phone: str = Field(pattern=r"^[0-9]{10}$")
-    password: str = Field(min_length=1, max_length=72)
+    password: str = Field(min_length=8, max_length=72)
     role: Literal["customer", "owner"] = "customer"
 
     @field_validator("password")
@@ -100,6 +100,36 @@ class MealUpdate(MealDates):
     def reject_null(cls, value):
         if value is None:
             raise ValueError("This field cannot be null")
+        return value
+
+
+class WeeklyMenuItem(BaseModel):
+    weekday: int = Field(ge=0, le=6)
+    meal_type: Literal["breakfast", "lunch", "dinner"]
+    menu_description: str = Field(min_length=1, max_length=500)
+    image_url: Optional[str] = None
+    single_price: Optional[float] = Field(default=None, gt=0, le=10000, allow_inf_nan=False, multiple_of=0.01)
+    is_complimentary: bool = True
+    cutoff_time: str = Field(pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$")
+
+    @field_validator("menu_description")
+    @classmethod
+    def clean_menu_description(cls, value):
+        value = value.strip()
+        if not value:
+            raise ValueError("Enter at least one dish for this meal")
+        return value
+
+
+class WeeklyMenuSave(BaseModel):
+    items: list[WeeklyMenuItem] = Field(max_length=21)
+
+    @field_validator("items")
+    @classmethod
+    def unique_weekday_meals(cls, value):
+        keys = [(item.weekday, item.meal_type) for item in value]
+        if len(keys) != len(set(keys)):
+            raise ValueError("Choose each meal type only once per weekday")
         return value
 
 

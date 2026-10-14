@@ -1,10 +1,17 @@
 """New skips earn one subscription day; old financial deductions stay historical."""
 from datetime import timedelta
+from sqlalchemy import update
 from app import models
 
 
-def lock_customer(db, user_id):
-    db.query(models.User).filter_by(id=user_id).with_for_update().first()
+def lock_customer(db, user_id, all_messes=False):
+    # A no-op UPDATE obtains a row lock on PostgreSQL and a write reservation
+    # on SQLite, where SELECT ... FOR UPDATE is ignored. All customer action
+    # flows use this as their first database operation before checking state.
+    return db.execute(
+        update(models.User).where(models.User.id == user_id).values(id=models.User.id),
+        execution_options={"synchronize_session": False, "all_messes": all_messes},
+    ).rowcount == 1
 
 
 def change_extension(db, plan, delta):

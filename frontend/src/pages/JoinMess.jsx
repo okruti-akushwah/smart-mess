@@ -1,24 +1,60 @@
-import useSignupSettings from "../services/useSignupSettings";
-import SignupOtp from "../components/SignupOtp";
-import { useTranslation } from "../i18n/useTranslation";
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
+import { useTranslation } from "../i18n/useTranslation";
+import { loginUrl, returnTo } from "../services/authRouting";
 import api, { errorMessage } from "../services/api";
+
 export default function JoinMess() {
   const translate = useTranslation();
   const { token } = useParams();
-  const [owner, setOwner] = useState(''),[error, setError] = useState(''),[success, setSuccess] = useState(''),[busy, setBusy] = useState(false);
-  const [verification, setVerification] = useState(null);
-  const [form, setForm] = useState({ name: '', phone: '', password: '' });
-  const { settings, settingsError } = useSignupSettings();
-  const demo = settings?.demo_registration === true;
-  const phoneReady = /^[0-9]{10}$/.test(form.phone) && (demo || verification?.phone === form.phone);
-  const verificationId = verification?.phone === form.phone ? verification.id : null;
-  useEffect(() => {let active = true;api.get(`/join/${token}`).then(r => {if (active) setOwner(r.data.mess_name || `${r.data.owner_name}’s mess`);}).catch(e => {if (active) setError(errorMessage(e));});return () => {active = false;};}, [token]);
-  async function submit(verificationId) {
-    setBusy(true);setError('');
-    try {const r = await api.post(`/join/${token}`, { ...form, verification_id: verificationId });setSuccess(r.data.message);setForm({ ...form, password: '' });}
-    catch (e) {setError(errorMessage(e));throw e;} finally {setBusy(false);}
-  }
-  return <main className="dashboard"><section className={`management-card join-signup-card ${success ? "join-success-card" : ""}`}><p className="eyebrow">{translate("SMART MESS")}</p>{!success && <><h1>{translate(owner ? `Join ${owner}` : 'Join a mess')}</h1><p>{translate(demo ? "Demo registration: no SMS is sent and your mobile number remains unverified. Your owner must approve your join request before you can order meals or choose a subscription." : "Create your account and verify your mobile number. After your owner approves your join request, log in to view plans and choose your subscription.")}</p></>}{settingsError && <p className="alert error" role="alert">{translate(settingsError)}</p>}{error && <p className="alert error" role="alert">{translate(error)}</p>}{success ? <div className="join-success-content"><span className="join-success-icon" aria-hidden="true">✓</span><p className="join-success-status">{translate("REQUEST RECEIVED")}</p><h1>{translate("Your next meal starts here.")}</h1><p className="join-success-mess">{owner}</p><p className="join-success-description" role="status">{translate(success)}</p><div className="join-success-next"><strong>{translate("What happens next?")}</strong><p>{translate("Your owner will review your request. Log in to check approval, then explore plans and choose your subscription.")}</p></div><Link className="btn btn-primary join-success-login" to="/login">{translate("Log in to check approval")}<span aria-hidden="true">→</span></Link><Link className="join-success-back" to={`/mess/${token}`}>{translate("Back to mess page")}</Link></div> : owner && (<form className="meal-form" onSubmit={event => {event.preventDefault();setError("");if (!phoneReady) {setError("Please verify your phone number first.");return;}submit(verificationId).catch(() => {});}}><div className="join-phone-column">{[['phone', 'Phone number / login ID', 'tel']].map(([key, label, type]) => <div className="form-field" key={key}><label htmlFor={`join-${key}`}>{translate(label)}<input id={`join-${key}`} required type={type} minLength={1} maxLength={key === 'phone' ? 10 : key === 'password' ? 72 : 100} pattern={key === 'phone' ? '[0-9]{10}' : undefined} autoComplete={key === 'password' ? 'new-password' : key === 'phone' ? 'tel' : 'name'} value={form[key]} onChange={(e) => {setForm({ ...form, [key]: e.target.value });if (key === "phone") setVerification(null);}} /></label>{key === "phone" && (/^[0-9]{10}$/.test(form.phone) ? phoneReady ? <p className="phone-verified" role="status">{translate(demo ? "Demo registration · Mobile number unverified" : "✓ Mobile number verified")}</p> : settings ? <SignupOtp key={form.phone} phone={form.phone} joinToken={token} inline autoSend onVerified={async id => setVerification({ id, phone: form.phone })} /> : <p role="status">{translate("Loading registration settings…")}</p> : <p className="phone-hint">{translate(demo ? "Enter your 10-digit mobile number. No SMS is sent in demo mode." : "Enter 10 digits to verify your mobile number.")}</p>)}</div>)}</div><div className="join-details-column">{[['name', 'Your name', 'text'], ['password', 'Choose your password', 'password']].map(([key, label, type]) => <div className="form-field" key={key}><label htmlFor={`join-${key}`}>{translate(label)}<input id={`join-${key}`} required type={type} minLength={1} maxLength={key === 'phone' ? 10 : key === 'password' ? 72 : 100} pattern={key === 'phone' ? '[0-9]{10}' : undefined} autoComplete={key === 'password' ? 'new-password' : key === 'phone' ? 'tel' : 'name'} value={form[key]} onChange={(e) => {setForm({ ...form, [key]: e.target.value });if (key === "phone") setVerification(null);}} /></label>{key === "phone" && (/^[0-9]{10}$/.test(form.phone) ? phoneReady ? <p className="phone-verified" role="status">{translate(demo ? "Demo registration · Mobile number unverified" : "✓ Mobile number verified")}</p> : settings ? <SignupOtp key={form.phone} phone={form.phone} joinToken={token} inline autoSend onVerified={async id => setVerification({ id, phone: form.phone })} /> : <p role="status">{translate("Loading registration settings…")}</p> : <p className="phone-hint">{translate(demo ? "Enter your 10-digit mobile number. No SMS is sent in demo mode." : "Enter 10 digits to verify your mobile number.")}</p>)}</div>)}</div><button className="btn btn-primary" disabled={busy || !phoneReady}>{translate(busy ? 'Sending…' : 'Request to join')}</button><p>{translate("Already have an account? Use your existing phone and password here to submit your request.")}</p></form>)}{!success && <p><Link to="/login">{translate("Go to login")}</Link></p>}</section></main>;
+  const location = useLocation();
+  const navigate = useNavigate();
+  const signedIn = !!localStorage.getItem("token");
+  const role = localStorage.getItem("role");
+  const [owner, setOwner] = useState("");
+  const [membership, setMembership] = useState(null);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [busy, setBusy] = useState(false);
+  const destination = returnTo(location, "/customer/choose");
+  useEffect(() => {
+    if (!signedIn || role !== "customer") return undefined;
+    let active = true;
+    Promise.all([api.get(`/join/${token}`), api.get("/customer/messes")])
+      .then(([details, memberships]) => {
+        if (!active) return;
+        setOwner(details.data.mess_name || `${details.data.owner_name}’s mess`);
+        setMembership(memberships.data.find(mess => mess.join_token === token) || null);
+      }).catch(err => { if (active) setError(errorMessage(err)); });
+    return () => { active = false; };
+  }, [token, signedIn, role]);
+  if (!signedIn) return <Navigate to={loginUrl(location.pathname + location.search + location.hash)} replace />;
+  if (role !== "customer") return <Navigate to="/owner" replace />;
+  const openMess = () => {
+    localStorage.setItem("activeMessToken", token);
+    navigate(destination.startsWith("/join/") ? "/customer/choose" : destination, { replace: true });
+  };
+  const request = async () => {
+    setBusy(true); setError("");
+    try {
+      const { data } = await api.post(`/join/${token}/request`, {});
+      setSuccess(data.message);
+      const response = await api.get("/customer/messes");
+      setMembership(response.data.find(mess => mess.join_token === token) || null);
+    } catch (err) { setError(errorMessage(err)); } finally { setBusy(false); }
+  };
+  return <main className="dashboard"><section className="management-card join-signup-card">
+    <p className="eyebrow">{translate("SMART MESS")}</p>
+    <h1>{translate(owner ? `Join ${owner}` : "Join a mess")}</h1>
+    <p>{translate("Use your existing account to request access. Each mess reviews its own membership request.")}</p>
+    {error && <p className="alert error" role="alert">{translate(error)}</p>}
+    {success && <p className="alert success" role="status">{translate(success)}</p>}
+    {owner && (membership?.status === "approved"
+      ? <button className="btn btn-primary" onClick={openMess}>{translate("Open mess")}</button>
+      : membership?.status === "pending"
+        ? <p role="status">{translate("Waiting for owner approval")}</p>
+        : <button className="btn btn-primary" onClick={request} disabled={busy}>{translate(busy ? "Sending request…" : "Request to join this mess")}</button>)}
+    <p><Link to="/customer/messes" state={{from: destination}}>{translate("My messes")}</Link></p>
+    <Link to={`/mess/${token}`}>{translate("Back to mess page")}</Link>
+  </section></main>;
 }

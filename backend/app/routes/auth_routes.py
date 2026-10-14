@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
@@ -14,6 +14,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 # ---------------------------------------------------------
 
 from pydantic import Field
+from typing import Literal
 from sqlalchemy.exc import IntegrityError
 from app.installation import initialize, check_owner
 
@@ -32,27 +33,31 @@ def registration_status(db: Session = Depends(get_db)):
 
 @router.post('/signup', response_model=schemas.UserOut)
 def signup(user: OwnerSetup, db: Session = Depends(get_db)):
-    if user.role != 'owner':
-        raise HTTPException(403, 'Customers must register using the mess QR or join link')
-    if not user.mess_name.strip() or not user.name.strip():
-        raise HTTPException(422, 'Enter your name and mess name')
+    if not user.name.strip():
+        raise HTTPException(422, 'Enter your name')
+    if user.role == 'owner' and not user.mess_name.strip():
+        raise HTTPException(422, 'Enter your mess name')
+    if user.role not in ('owner', 'customer'):
+        raise HTTPException(422, 'Choose a valid account type')
     if db.query(models.User).filter_by(phone=user.phone).first():
         raise HTTPException(409, 'Phone number already registered')
-    signup_otp.complete(db, user.verification_id, user.phone, "owner")
+    signup_otp.complete(db, user.verification_id, user.phone, user.role if user.role == 'owner' else 'member')
     new_user = models.User(name=user.name.strip(), phone=user.phone,
-                           password_hash=auth.hash_password(user.password), role='owner')
+                           password_hash=auth.hash_password(user.password), role=user.role)
     try:
         db.add(new_user)
         db.flush()
-        db.add(models.MessProfile(owner_id=new_user.id, name=user.mess_name.strip()))
-        import secrets
-        db.add(models.JoinInvite(owner_id=new_user.id, token=secrets.token_urlsafe(24)))
+        if user.role == 'owner':
+            db.add(models.MessProfile(owner_id=new_user.id, name=user.mess_name.strip()))
+            import secrets
+            db.add(models.JoinInvite(owner_id=new_user.id, token=secrets.token_urlsafe(24)))
         db.commit()
     except IntegrityError:
         db.rollback()
         raise HTTPException(409, 'This phone is already registered. Please log in.')
     db.refresh(new_user)
-    initialize(db)
+    if user.role == 'owner':
+        initialize(db)
     return new_user
 
 
@@ -64,6 +69,7 @@ def signup(user: OwnerSetup, db: Session = Depends(get_db)):
 @router.post("/login")
 def login(
     credentials: schemas.UserLogin,
+    request: Request,
     db: Session = Depends(get_db)
 ):
     user = (
@@ -76,11 +82,7 @@ def login(
     )
 
     if (
-        not user
-        or not auth.verify_password(
-            credentials.password,
-            user.password_hash
-        )
+        not auth.verify_password_limited(db, request, credentials.phone, credentials.password, user)
     ):
         raise HTTPException(
             status_code=401,
@@ -109,6 +111,7 @@ def login(
 
 @router.post("/token")
 def swagger_login(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
@@ -124,11 +127,7 @@ def swagger_login(
     )
 
     if (
-        not user
-        or not auth.verify_password(
-            form_data.password,
-            user.password_hash
-        )
+        not auth.verify_password_limited(db, request, form_data.username, form_data.password, user)
     ):
         raise HTTPException(
             status_code=401,
@@ -153,6 +152,7 @@ from pydantic import BaseModel
 class SignupOtpRequest(BaseModel):
     phone: str = Field(pattern=r"^[0-9]{10}$")
     join_token: str | None = Field(default=None, max_length=100)
+    role: Literal['customer', 'owner'] = 'owner'
 
 class SignupOtpCheck(BaseModel):
     challenge_id: str = Field(min_length=20, max_length=64)
@@ -170,7 +170,7 @@ def send_signup_otp(body: SignupOtpRequest, db: Session = Depends(get_db)):
         find_invite(body.join_token, db)
         scope = "join:" + body.join_token
     else:
-        scope = "owner"
+        scope = "owner" if body.role == 'owner' else 'member'
     return signup_otp.start(db, body.phone, scope)
 
 @router.post("/signup/verify-otp")

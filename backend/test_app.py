@@ -1,21 +1,26 @@
 import os
 import unittest
 from datetime import date, datetime, timedelta, timezone
+from uuid import uuid4
 os.environ['DATABASE_URL'] = 'sqlite://'
 os.environ['SIGNUP_OTP_MODE'] = 'off'
 os.environ['SECRET_KEY'] = 'isolated-test-secret-not-for-production'
+os.environ['APP_ENV'] = 'test'
+os.environ['RENDER'] = 'false'
 from sqlalchemy.pool import StaticPool
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from fastapi.testclient import TestClient
 from app.main import app
-from app.database import Base, get_db
+from app.database import Base, get_db, configure_sqlite_foreign_keys
 from app import models
+from app.migrate import upgrade
 
 class ApplicationTests(unittest.TestCase):
     def setUp(self):
         self.engine = create_engine('sqlite://', connect_args={'check_same_thread': False}, poolclass=StaticPool)
-        Base.metadata.create_all(self.engine)
+        configure_sqlite_foreign_keys(self.engine)
+        upgrade(self.engine)
         self.Session = sessionmaker(bind=self.engine)
         def database():
             with self.Session() as db:
@@ -84,7 +89,18 @@ class ApplicationTests(unittest.TestCase):
         other, _ = self.account('9876543212', 'customer')
         self.assertEqual(self.client.patch(url, headers=other, json={'status':'cancelled'}).status_code, 404)
         self.assertEqual(self.client.patch(url, headers=self.owner, json={'status':'approved'}).status_code, 200)
+        self.assertEqual(self.client.get('/subscriptions/current', headers=self.customer).json(), [])
+        purchase = next(row for row in self.client.get('/owner/payments', headers=self.owner).json()
+                        if row['purchase_name'] == offer['name'])
+        self.assertEqual(purchase['status'], 'pending_payment')
+        self.assertEqual(purchase['balance_due'], 700)
         self.assertEqual(self.client.patch(url, headers=self.owner, json={'status':'approved'}).status_code, 400)
+        for amount in (200, 500):
+            payment = self.client.post('/owner/payments', headers=self.owner,
+                json={'plan_id': purchase['plan_id'], 'amount': amount, 'receipt_key': str(uuid4())})
+            self.assertEqual(payment.status_code, 201, payment.text)
+            if amount == 200:
+                self.assertEqual(self.client.get('/subscriptions/current', headers=self.customer).json(), [])
         current = self.client.get('/subscriptions/current', headers=self.customer).json()[0]
         self.assertEqual(current['end_date'], (date.today()+timedelta(days=6)).isoformat())
         self.assertEqual(self.client.get('/bills/current', headers=self.customer).json()['base_amount'], 700)

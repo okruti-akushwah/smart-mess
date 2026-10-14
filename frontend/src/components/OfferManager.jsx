@@ -1,14 +1,165 @@
-import { useTranslation } from "../i18n/useTranslation";
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "../i18n/useTranslation";
 import api, { errorMessage } from "../services/api";
 import "./discovery.css";
-const initial = { name: "", category: "regular", duration_days: 7, price: "", meal_price: 50, meal_types: ["breakfast", "lunch", "dinner"], description: "" };
-export default function OfferManager({ view = "all" }) {
+
+const initial = {
+  name: "",
+  category: "regular",
+  duration_days: 7,
+  price: "",
+  meal_price: 50,
+  meal_types: ["breakfast", "lunch", "dinner"],
+  description: "",
+};
+
+export default function OfferManager() {
   const translate = useTranslation();
-  const [form, setForm] = useState(initial),[offers, setOffers] = useState([]),[requests, setRequests] = useState([]),[error, setError] = useState(""),[message, setMessage] = useState(""),[busy, setBusy] = useState(false);
-  const load = useCallback(async () => {try {const [o, r] = await Promise.all([api.get("/owner/offers"), api.get("/owner/requests")]);setOffers(o.data);setRequests(r.data);} catch (e) {setError(errorMessage(e));}}, []);
-  useEffect(() => {const t = setTimeout(load, 0);const interval = setInterval(load, 5000);window.addEventListener('focus', load);return () => {clearTimeout(t);clearInterval(interval);window.removeEventListener('focus', load);};}, [load]);
-  async function perform(fn) {setBusy(true);setError("");setMessage("");try {const r = await fn();setMessage(r.data.message || "Plan published.");await load();window.dispatchEvent(new Event("subscription-updated"));} catch (e) {setError(errorMessage(e));} finally {setBusy(false);}}
-  function change(e) {setForm({ ...form, [e.target.name]: e.target.value });}
-  return <section id="subscription-plans" className="management-card">{view !== "requests" && <><p className="eyebrow">{translate("TRIAL, WEEKLY & MONTHLY CHOICES")}</p><h2>{translate("Publish your plans")}</h2><p className="muted">{translate("Publish real prices and descriptions for customers to choose. Choose the meals included in each plan. Only the selected breakfast, lunch or dinner meals are booked during its dates.")}</p>{error && <div className="alert error" role="alert">{translate(error)}</div>}{message && <div className="alert success" role="status">{translate(message)}</div>}<form className="meal-form" onSubmit={(e) => {e.preventDefault();perform(async () => {const r = await api.post("/owner/offers", { ...form, duration_days: Number(form.duration_days), price: Number(form.price), meal_price: Number(form.meal_price) });setForm(initial);return r;});}}><label className="form-field">{translate("Plan name")}<input required minLength={3} maxLength={80} name="name" value={form.name} onChange={change} /></label><label className="form-field">{translate("Category")}<select name="category" value={form.category} onChange={change}>{["regular", "mini", "protein", "special"].map((c) => <option key={c} value={c}>{translate(c)}</option>)}</select></label><label className="form-field">{translate("Duration in days")}<input required type="number" min="1" max="365" name="duration_days" value={form.duration_days} onChange={change} /></label><label className="form-field">{translate("Total price (₹)")}<input required type="number" min="0.01" max="100000" step="0.01" name="price" value={form.price} onChange={change} /></label><fieldset className="form-field"><legend>Meals included</legend>{["breakfast", "lunch", "dinner"].map(type => <label key={type} className="plan-meal-option"><input type="checkbox" checked={form.meal_types.includes(type)} onChange={e => setForm(previous => ({ ...previous, meal_types: e.target.checked ? [...previous.meal_types, type] : previous.meal_types.filter(value => value !== type) }))} />{translate(type)}</label>)}{!form.meal_types.length && <p role="alert">Choose at least one meal.</p>}</fieldset><p className="muted">Each skipped meal adds one subscription day.</p><label className="form-field">{translate("What's included")}<input required minLength={3} maxLength={500} name="description" value={form.description} onChange={change} /></label><div className="form-actions"><button className="btn btn-primary" disabled={busy || !form.meal_types.length}>{translate("Publish plan")}</button></div></form>{offers.map((o) => <div className="request-row" key={o.id}><div><strong>{o.name} · ₹{translate(o.price)}</strong><p>{translate(o.category)} · {translate(o.duration_days)}{translate(" days · ")}{o.description}</p><p>Includes: {(o.meal_types || ["breakfast", "lunch", "dinner"]).map(translate).join(" · ")}</p></div><div><button className="btn btn-outline" disabled={busy || o.assigned_count > 0} onClick={() => perform(() => api.delete(`/owner/offers/${o.id}`))}>{translate("Unpublish")}</button>{o.assigned_count > 0 && <p className="muted" role="status">{translate("Assigned to customers. Unpublish after their subscriptions end or are cancelled.")}</p>}</div></div>)}</>}{view !== "plans" && <><h2 id="owner-plan-requests">{translate("Subscription requests")}</h2>{requests.length ? requests.map((r) => <div className="request-row" key={r.id}><div><strong>{translate(r.customer_name)} · {r.offer.name}</strong><p>{translate(r.customer_phone)}{translate(" · starts ")}{translate(r.start_date)} · ₹{translate(r.offer.price)}</p></div><div className="form-actions"><button className="btn btn-primary" disabled={busy} onClick={() => perform(() => api.patch(`/subscriptions/requests/${r.id}`, { status: "approved" }))}>{translate("Approve")}</button><button className="btn btn-outline" disabled={busy} onClick={() => perform(() => api.patch(`/subscriptions/requests/${r.id}`, { status: "rejected" }))}>{translate("Decline")}</button></div></div>) : <p className="muted">{translate("No pending requests.")}</p>}</>}</section>;
+  const [form, setForm] = useState(initial);
+  const [offers, setOffers] = useState([]);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const response = await api.get("/owner/offers");
+      setOffers(response.data);
+      setError("");
+    } catch (e) {
+      setError(errorMessage(e));
+    }
+  }, []);
+
+  useEffect(() => {
+    const timeout = setTimeout(load, 0);
+    const interval = setInterval(load, 5000);
+    window.addEventListener("focus", load);
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(interval);
+      window.removeEventListener("focus", load);
+    };
+  }, [load]);
+
+  async function perform(action) {
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const response = await action();
+      setMessage(response.data.message || "Plan published.");
+      await load();
+      window.dispatchEvent(new Event("subscription-updated"));
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function change(event) {
+    setForm({ ...form, [event.target.name]: event.target.value });
+  }
+
+  return (
+    <section id="subscription-plans" className="management-card">
+      <p className="eyebrow">{translate("TRIAL, WEEKLY & MONTHLY CHOICES")}</p>
+      <h2>{translate("Publish your plans")}</h2>
+      <p className="muted">
+        {translate("Publish real prices and descriptions for members to choose. Choose the meals included in each plan. Only the selected breakfast, lunch or dinner meals are booked during its dates.")}
+      </p>
+      {error && <div className="alert error" role="alert">{translate(error)}</div>}
+      {message && <div className="alert success" role="status">{translate(message)}</div>}
+      <form
+        className="meal-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          perform(async () => {
+            const response = await api.post("/owner/offers", {
+              ...form,
+              duration_days: Number(form.duration_days),
+              price: Number(form.price),
+              meal_price: Number(form.meal_price),
+            });
+            setForm(initial);
+            return response;
+          });
+        }}
+      >
+        <label className="form-field">
+          {translate("Plan name")}
+          <input required minLength={3} maxLength={80} name="name" value={form.name} onChange={change} />
+        </label>
+        <label className="form-field">
+          {translate("Category")}
+          <select name="category" value={form.category} onChange={change}>
+            {["regular", "mini", "protein", "special"].map((category) => (
+              <option key={category} value={category}>{translate(category)}</option>
+            ))}
+          </select>
+        </label>
+        <label className="form-field">
+          {translate("Duration in days")}
+          <input required type="number" min="1" max="365" name="duration_days" value={form.duration_days} onChange={change} />
+        </label>
+        <label className="form-field">
+          {translate("Total price (₹)")}
+          <input required type="number" min="0.01" max="100000" step="0.01" name="price" value={form.price} onChange={change} />
+        </label>
+        <fieldset className="form-field">
+          <legend>Meals included</legend>
+          {["breakfast", "lunch", "dinner"].map((type) => (
+            <label key={type} className="plan-meal-option">
+              <input
+                type="checkbox"
+                checked={form.meal_types.includes(type)}
+                onChange={(event) => setForm((previous) => ({
+                  ...previous,
+                  meal_types: event.target.checked
+                    ? [...previous.meal_types, type]
+                    : previous.meal_types.filter((value) => value !== type),
+                }))}
+              />
+              {translate(type)}
+            </label>
+          ))}
+          {!form.meal_types.length && <p role="alert">Choose at least one meal.</p>}
+        </fieldset>
+        <p className="muted">Each skipped meal adds one subscription day.</p>
+        <label className="form-field">
+          {translate("What's included")}
+          <input required minLength={3} maxLength={500} name="description" value={form.description} onChange={change} />
+        </label>
+        <div className="form-actions">
+          <button className="btn btn-primary" disabled={busy || !form.meal_types.length}>
+            {translate("Publish plan")}
+          </button>
+        </div>
+      </form>
+      {offers.map((offer) => (
+        <div className="request-row" key={offer.id}>
+          <div>
+            <strong>{offer.name} · ₹{translate(offer.price)}</strong>
+            <p>{translate(offer.category)} · {translate(offer.duration_days)}{translate(" days · ")}{offer.description}</p>
+            <p>Includes: {(offer.meal_types || ["breakfast", "lunch", "dinner"]).map(translate).join(" · ")}</p>
+          </div>
+          <div>
+            <button
+              className="btn btn-outline"
+              disabled={busy || offer.assigned_count > 0}
+              onClick={() => perform(() => api.delete(`/owner/offers/${offer.id}`))}
+            >
+              {translate("Unpublish")}
+            </button>
+            {offer.assigned_count > 0 && (
+              <p className="muted" role="status">
+                {translate("Assigned to members. Unpublish after their subscriptions end or are cancelled.")}
+              </p>
+            )}
+          </div>
+        </div>
+      ))}
+    </section>
+  );
 }

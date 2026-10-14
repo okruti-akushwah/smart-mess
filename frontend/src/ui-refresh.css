@@ -23,7 +23,18 @@ p { line-height: 1.6; }
 .btn-outline { border: 1px solid #d7e2db; background: white; color: var(--ink); box-shadow: none; }
 .btn-outline:hover:not(:disabled) { background: #f0f5ec; }
 .btn:disabled { opacity: .5; box-shadow: none; transform: none; }
-button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline: 3px solid #dc8b36; outline-offset: 4px; }
+button:focus-visible, a:focus-visible, summary:focus-visible {
+  outline: 2px solid #6f9b7b;
+  outline-offset: 2px;
+}
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+.auth-card input:focus, .auth-card select:focus {
+  border-color: #d8e1da;
+  box-shadow: none;
+}
 .welcome, .customer-overview { background: var(--ink); color: white; border-radius: 26px; padding: 30px 34px; border: none; overflow: hidden; position: relative; }
 .owner-dashboard .welcome.owner-welcome { background: var(--ink); color: white; }
 .owner-dashboard .welcome.owner-welcome h1 { color: white; }
@@ -71,7 +82,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .status-badge, .history-status { border-radius: 20px; font-size: 10px; font-weight: 700; padding: 6px 10px; }
 .meal-actions .btn { flex: 1; }
 .form-field input, .form-field select { border-radius: 12px; background: #f9faf6; border-color: #dbe4d9; padding: 12px 14px; }
-.form-field input:focus, .form-field select:focus { border-color: var(--teal); }
+.form-field input:focus, .form-field select:focus { border-color: #d5dfd5; }
 .request-row { border-radius: 14px; padding: 18px; background: #f8faf6; margin-top: 12px; border: 1px solid #edf0e7; }
 .request-row p { margin: 5px 0; font-size: 13px; }
 .day-switch { display: flex; gap: 8px; flex-wrap: wrap; margin: 18px 0; }

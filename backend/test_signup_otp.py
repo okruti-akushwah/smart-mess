@@ -15,8 +15,8 @@ class SignupOtpTests(ApplicationTests):
     def tearDown(self):
         self.logs.stop();self.random.stop();self.config.stop();super().tearDown()
 
-    def request(self, phone="9999999999", token=None):
-        r=self.client.post('/auth/signup/otp',json={"phone":phone,"join_token":token})
+    def request(self, phone="9999999999", token=None, role="owner"):
+        r=self.client.post('/auth/signup/otp',json={"phone":phone,"join_token":token,"role":role})
         self.assertEqual(r.status_code,200,r.text)
         self.assertNotIn('123456',r.text)
         self.assertNotIn('access_token',r.json())
@@ -50,7 +50,7 @@ class SignupOtpTests(ApplicationTests):
 
     def test_owner_signup_requires_verified_phone(self):
         with self.Session() as db: db.query(models.User).delete();db.commit()
-        body={"name":"Owner","mess_name":"Test Mess","phone":"9999999999","password":"1234","role":"owner"}
+        body={"name":"Owner","mess_name":"Test Mess","phone":"9999999999","password":"test1234","role":"owner"}
         self.assertEqual(self.client.post('/auth/signup',json=body).status_code,403)
         challenge=self.request()
         self.assertEqual(self.client.post('/auth/signup',json={**body,"verification_id":challenge}).status_code,403)
@@ -58,6 +58,19 @@ class SignupOtpTests(ApplicationTests):
         self.assertEqual(self.client.post('/auth/signup',json={**body,"verification_id":challenge}).status_code,200)
         with self.Session() as db: self.assertTrue(db.get(models.SignupChallenge,challenge).consumed)
         self.assertEqual(self.verify(challenge).status_code,400)
+
+    def test_member_can_register_once_before_selecting_a_mess(self):
+        phone = '9999999999'
+        challenge = self.request(phone=phone, role='customer')
+        verified = self.verify(challenge)
+        self.assertEqual(verified.status_code, 200, verified.text)
+        body = {'name':'Global member','phone':phone,'password':'test1234','role':'customer',
+                'verification_id':verified.json()['verification_id']}
+        response = self.client.post('/auth/signup', json=body)
+        self.assertEqual(response.status_code, 200, response.text)
+        login = self.client.post('/auth/login', json={'phone':phone,'password':'test1234'})
+        headers = {'Authorization':'Bearer '+login.json()['access_token']}
+        self.assertEqual(self.client.get('/customer/messes', headers=headers).json(), [])
 
     def test_phone_can_be_verified_before_owner_details_are_entered(self):
         self.assertEqual(self.client.post('/auth/signup/otp', json={'phone': '99999'}).status_code, 422)
@@ -79,7 +92,7 @@ class SignupOtpTests(ApplicationTests):
 
     def test_customer_signup_phone_binding_and_approval(self):
         token=self.client.get('/owner/join-link',headers=self.owner).json()['token']; offer=self.offer()
-        body={"name":"New Customer","phone":"9999999999","password":"1234","offer_id":offer['id'],"start_date":date.today().isoformat()}
+        body={"name":"New Customer","phone":"9999999999","password":"test1234","offer_id":offer['id'],"start_date":date.today().isoformat()}
         url='/join/'+token
         self.assertEqual(self.client.post(url,json=body).status_code,403)
         challenge=self.request(token=token); self.assertEqual(self.verify(challenge).status_code,200)

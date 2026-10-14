@@ -31,13 +31,13 @@ class DatePauseTests(unittest.TestCase):
         dinner=self.meal(days=2,meal_type='dinner')
         upcoming=self.client.get('/meals/upcoming',headers=self.customer).json()
         self.assertEqual({m['status'] for m in upcoming},{'skipped'})
-        self.assertEqual(self.client.get('/subscriptions/current',headers=self.customer).json()[0]['skip_count'],2)
+        self.assertEqual(self.client.get('/subscriptions/current',headers=self.customer).json()[0]['skip_count'],1)
         self.assertEqual(self.client.post('/meals/add-guest',headers=self.customer,json={'meal_id':lunch['id']}).status_code,409)
         rows=self.client.get('/dashboard/headcount',headers=self.owner).json()['preparation']
         self.assertTrue(all(m['expected_headcount']==0 for m in rows))
         self.client.put(f"/owner/meals/{dinner['id']}",headers=self.owner,json={'menu_description':'New dinner menu'})
         self.client.post('/subscriptions/pause',headers=self.customer,json=body)
-        self.assertEqual(self.client.get('/subscriptions/current',headers=self.customer).json()[0]['skip_count'],2)
+        self.assertEqual(self.client.get('/subscriptions/current',headers=self.customer).json()[0]['skip_count'],1)
         self.assertIn(day,self.client.get('/subscriptions/pause-preview',headers=self.customer,params=body).json()['saved_dates'])
 
     def test_existing_and_unpublished_dates_share_persistent_pause(self):

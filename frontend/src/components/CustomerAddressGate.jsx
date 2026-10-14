@@ -3,7 +3,8 @@ import { Navigate, useLocation } from "react-router-dom";
 import api, { errorMessage } from "../services/api";
 
 export default function CustomerAddressGate({ children }) {
-  const { pathname } = useLocation();
+  const location = useLocation();
+  const { pathname } = location;
   const [state, setState] = useState({ loading: true });
   useEffect(() => {
     let live = true;
@@ -15,6 +16,6 @@ export default function CustomerAddressGate({ children }) {
   if (state.path !== pathname) return <main className="dashboard"><p role="status">Checking your delivery details…</p></main>;
   if (state.error) return <main className="dashboard"><p className="alert error" role="alert">{state.error}</p><button className="btn btn-outline" onClick={() => window.location.reload()}>Try again</button></main>;
   if (state.loading) return <main className="dashboard"><p role="status">Checking your delivery details…</p></main>;
-  if (!state.ready) return <Navigate to="/customer/address" replace />;
+  if (!state.ready) return <Navigate to="/customer/address" state={{ from: pathname + location.search + location.hash }} replace />;
   return children;
 }

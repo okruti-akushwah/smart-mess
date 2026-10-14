@@ -5,14 +5,14 @@ invite token; authenticated requests derive it from the stored membership.
 Unscoped sessions are reserved for registration, authentication and migration.
 """
 from fastapi import Depends, HTTPException, Request
-from sqlalchemy import event, or_
+from sqlalchemy import event, or_, select
 from sqlalchemy.orm import Session, with_loader_criteria
 from app import models
 from app.database import get_db
 
 SCOPED_MODELS = tuple(
     mapper.class_ for mapper in models.Base.registry.mappers
-    if hasattr(mapper.class_, "owner_id") and mapper.class_ is not models.MessInstallation
+    if hasattr(mapper.class_, "owner_id") and mapper.class_ not in (models.MessInstallation, models.DeliveryProfile)
 )
 
 
@@ -24,17 +24,25 @@ def default_owner_id(db):
     return owner.id if owner else None
 
 
-def owner_for_user(db, user):
+def owner_for_user(db, user, mess_token=None):
     if user.role == "owner":
         return user.id
+    if mess_token:
+        invite = db.query(models.JoinInvite).filter_by(token=mess_token).first()
+        if not invite:
+            raise HTTPException(403, "Select a valid mess to continue")
+        membership = db.query(models.JoinRequest).filter_by(user_id=user.id, owner_id=invite.owner_id).first()
+        if not membership and user.mess_owner_id != invite.owner_id:
+            raise HTTPException(403, "Request to join this mess before opening its member account")
+        return invite.owner_id
+    memberships = db.query(models.JoinRequest).filter_by(user_id=user.id).all()
+    if len(memberships) == 1:
+        return memberships[0].owner_id
+    if len(memberships) > 1:
+        raise HTTPException(409, "Choose a mess from your account before continuing")
     if user.mess_owner_id:
         return user.mess_owner_id
-    membership = db.query(models.JoinRequest).filter_by(user_id=user.id).first()
-    # Existing customer accounts without join requests belong to the original mess.
-    owner_id = membership.owner_id if membership else default_owner_id(db)
-    if not owner_id:
-        raise HTTPException(403, "Join a mess using its owner's invitation link")
-    return owner_id
+    raise HTTPException(403, "Join a mess using its owner's invitation link")
 
 
 def scope(db, owner_id):
@@ -53,7 +61,8 @@ def isolate_queries(state):
         entity, entity.owner_id == owner_id, include_aliases=True
     ) for entity in SCOPED_MODELS]
     options.append(with_loader_criteria(models.User, or_(
-        models.User.id == owner_id, models.User.mess_owner_id == owner_id
+        models.User.id == owner_id, models.User.mess_owner_id == owner_id,
+        models.User.id.in_(select(models.JoinRequest.user_id).where(models.JoinRequest.owner_id == owner_id)),
     ), include_aliases=True))
     state.statement = state.statement.options(*options)
 
@@ -68,7 +77,9 @@ def isolate_writes(db, context, instances):
             if item.role == "customer" and item in db.new and item.mess_owner_id is None:
                 item.mess_owner_id = owner_id
             if item.id != owner_id and item.mess_owner_id != owner_id:
-                raise HTTPException(403, "Customer belongs to another mess")
+                membership = db.query(models.JoinRequest.id).filter_by(user_id=item.id, owner_id=owner_id).first()
+                if not membership:
+                    raise HTTPException(403, "Customer does not belong to this mess")
         elif isinstance(item, SCOPED_MODELS):
             if item in db.new and item.owner_id is None:
                 item.owner_id = owner_id
@@ -102,7 +113,7 @@ def public_db(request: Request, db: Session = Depends(get_db)):
             raise HTTPException(401, "Invalid or expired token")
         if not user:
             raise HTTPException(401, "User not found")
-        owner_id = owner_for_user(db, user)
+        owner_id = owner_for_user(db, user, request.headers.get("X-Mess-Token"))
     else:
         owner_id = default_owner_id(db)
     # Empty installations have empty catalogues, never an unscoped query.

@@ -72,8 +72,13 @@ class MultiMessTests(ApplicationTests):
         self.assertEqual(self.client.post('/join/' + token, json={**body, 'offer_id': first_offer['id']}).status_code, 422)
         self.assertEqual(self.client.patch(endpoint, headers=other, json={'status': 'approved'}).status_code, 200)
         self.assertEqual(self.client.get('/join-status', headers=customer).json()['status'], 'approved')
-        current = self.client.get('/subscriptions/current', headers=customer).json()[0]
-        self.assertEqual(current['name'], offer['name'])
+        # Approval grants membership; the selected plan still needs confirmed payment.
+        self.assertEqual(self.client.get('/subscriptions/current', headers=customer).json(), [])
+        with self.Session() as db:
+            plan = db.query(models.MealPlan).filter_by(owner_id=other_id, offer_id=offer['id']).one()
+            self.assertEqual(plan.status, 'pending_payment')
+            self.assertEqual(plan.plan_type, offer['name'])
+            current = {'id': plan.id}
         self.assertEqual(self.client.get('/owner/customers', headers=self.owner).json()[0]['id'], self.customer_id)
         users = self.client.get('/owner/customers', headers=other).json()
         self.assertEqual([u['name'] for u in users], ['Second customer'])
@@ -84,7 +89,8 @@ class MultiMessTests(ApplicationTests):
         self.assertEqual(self.client.post('/subscriptions/requests', headers=customer,
             json={'offer_id': first_offer['id'], 'start_date': (date.today()+timedelta(days=10)).isoformat()}).status_code, 404)
         first_token = self.client.get('/owner/join-link', headers=self.owner).json()['token']
-        self.assertEqual(self.client.post('/join/' + first_token, json={**body, 'offer_id': first_offer['id']}).status_code, 409)
+        # One existing account can request another mess without changing its legacy owner.
+        self.assertEqual(self.client.post('/join/' + first_token, json={**body, 'offer_id': first_offer['id']}).status_code, 201)
         with self.Session() as db:
             self.assertEqual(db.get(models.User, users[0]['id']).mess_owner_id, other_id)
 
@@ -95,6 +101,14 @@ class MultiMessTests(ApplicationTests):
         offer = self.second_offer(other)
         customer, request, _ = self.second_customer(other, token, offer)
         self.client.patch('/owner/join-requests/' + str(request['id']), headers=other, json={'status': 'approved'})
+        # This isolation fixture represents a legacy active subscription.
+        # Payment-gated activation is covered by purchase and assignment tests.
+        with self.Session() as db:
+            plan = db.query(models.MealPlan).filter_by(user_id=request['user_id'] if 'user_id' in request else
+                db.query(models.User).filter_by(phone='9999999998').one().id, offer_id=offer['id']).one()
+            self.assertEqual(plan.status, 'pending_payment')
+            plan.status = 'active'
+            db.commit()
         meal = self.client.post('/owner/meals', headers=other, json={
             'date': date.today().isoformat(), 'meal_type': 'lunch', 'menu_description': 'Second lunch'}).json()
         self.assertEqual([m['id'] for m in self.client.get('/meals/today', headers=customer).json()], [meal['id']])

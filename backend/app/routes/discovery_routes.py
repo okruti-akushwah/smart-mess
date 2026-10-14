@@ -1,15 +1,18 @@
 from datetime import date, datetime, timedelta, timezone
 from typing import Literal
+from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, and_
+from sqlalchemy import or_, and_, func
 from app import models, schemas
 from app.meal_coverage import covers, included_types
 from app.auth import get_current_user
 from app.database import get_db
+from app.subscription_extensions import lock_customer
 from app.routes.owner_meal_routes import require_owner
 from app.tenancy import public_db
+from app.weekly_menu import sync_weekly_menu, weekly_menu_lock
 
 router = APIRouter(tags=["menu, plans and reviews"])
 
@@ -53,8 +56,12 @@ def offer_output(offer):
 
 @router.get("/public/menu", response_model=list[schemas.MealOut])
 def menu(db: Session = Depends(public_db)):
+    owner_id = db.info.get("mess_owner_id")
+    with weekly_menu_lock(owner_id):
+        sync_weekly_menu(db, owner_id)
+        db.commit()
     return db.query(models.Meal).filter(models.Meal.date >= date.today(),
-        models.Meal.date <= date.today() + timedelta(days=7)).order_by(models.Meal.date, models.Meal.cutoff_time).all()
+        models.Meal.date <= date.today() + timedelta(days=6)).order_by(models.Meal.date, models.Meal.cutoff_time).all()
 
 
 @router.get("/public/plans")
@@ -155,8 +162,13 @@ def decide(request_id: int, body: Decision, db: Session = Depends(get_db), user=
         end = req.start_date + timedelta(days=req.offer.duration_days - 1)
         if db.query(models.MealPlan).filter(models.MealPlan.user_id == req.user_id, models.MealPlan.status.in_(["active", "pending_payment"]), models.MealPlan.start_date <= end, models.MealPlan.end_date >= req.start_date).first():
             raise HTTPException(400, "Customer already has a subscription for these dates")
-        db.add(models.MealPlan(user_id=req.user_id, offer_id=req.offer_id, plan_type=req.offer.name, price=req.offer.price,
-            meal_types=list(included_types(req.offer)), meal_price=req.offer.meal_price, start_date=req.start_date, end_date=end, status="active"))
+        plan = models.MealPlan(user_id=req.user_id, offer_id=req.offer_id, purchase_key=str(uuid4()),
+            plan_type=req.offer.name, price=req.offer.price, meal_types=list(included_types(req.offer)),
+            meal_price=req.offer.meal_price, start_date=req.start_date, end_date=end, status="pending_payment")
+        db.add(plan)
+        db.flush()
+        db.add(models.IssuedBill(user_id=req.user_id, plan_id=plan.id, base_amount=offer.price,
+            deductions=0, extras_total=0, final_amount=offer.price))
     req.status = body.status
     db.commit()
     return {"message": f"Request {body.status}"}
@@ -164,8 +176,15 @@ def decide(request_id: int, body: Decision, db: Session = Depends(get_db), user=
 
 @router.get("/subscriptions/current")
 def current_plan(db: Session = Depends(get_db), user=Depends(customer)):
+    plans = db.query(models.MealPlan).filter(models.MealPlan.user_id == user.id, models.MealPlan.meal_id.is_(None), models.MealPlan.status == "active", models.MealPlan.end_date >= date.today()).order_by(models.MealPlan.start_date).all()
+    plan_ids = [plan.id for plan in plans]
+    skipped_meals = dict(db.query(models.MealOrder.extension_plan_id, func.count(models.MealOrder.id)).filter(
+        models.MealOrder.user_id == user.id, models.MealOrder.status == "skipped",
+        models.MealOrder.extension_plan_id.in_(plan_ids),
+    ).group_by(models.MealOrder.extension_plan_id).all()) if plan_ids else {}
     return [{"id": p.id, "offer_id": p.offer_id, "name": p.plan_type, "price": float(p.price), "meal_price": float(p.meal_price),
-             "start_date": p.start_date, "end_date": p.end_date, "skip_count": p.skip_count or 0, "meal_types": included_types(p)} for p in db.query(models.MealPlan).filter(models.MealPlan.user_id == user.id, models.MealPlan.meal_id.is_(None), models.MealPlan.status == "active", models.MealPlan.end_date >= date.today()).order_by(models.MealPlan.start_date).all()]
+             "start_date": p.start_date, "end_date": p.end_date, "skip_count": p.skip_count or 0,
+             "skipped_meals": skipped_meals.get(p.id, 0), "meal_types": included_types(p)} for p in plans]
 
 
 class PauseInput(BaseModel):
@@ -175,7 +194,7 @@ class PauseInput(BaseModel):
 
 def pause_result(body, db, user, apply=False):
     from app.subscription_extensions import lock_customer, change_extension
-    from app.date_pauses import lock_mess
+    from app.date_pauses import lock_mess, has_skipped_meal_for_date
     if apply:
         lock_mess(db)
         lock_customer(db, user.id)
@@ -208,6 +227,8 @@ def pause_result(body, db, user, apply=False):
     coverage_dates = {p.id: (p.start_date, p.end_date) for p in plans}
     now = datetime.now(timezone.utc)
     eligible, unchanged = [], []
+    credited_dates = set()
+    extension_days = 0
     for meal in meals:
         plan = next((p for p in plans if coverage_dates[p.id][0] <= meal.date <= coverage_dates[p.id][1] and meal.meal_type in included_types(p)), None)
         delivery = db.query(models.DeliveryUpdate).filter_by(user_id=user.id, meal_id=meal.id).first()
@@ -227,24 +248,37 @@ def pause_result(body, db, user, apply=False):
         if reason:
             unchanged.append({**item, "reason": reason})
             continue
-        eligible.append({**item, "deduction": 0, "extension_days": 1})
+        date_already_credited = meal.date in credited_dates or has_skipped_meal_for_date(
+            db, user.id, plan.id, meal.date)
+        if date_already_credited:
+            credited_dates.add(meal.date)
+        else:
+            credited_dates.add(meal.date)
+            extension_days += 1
+        eligible.append({**item, "deduction": 0, "extension_days": 0 if date_already_credited else 1})
         if apply:
             if not order:
                 order = models.MealOrder(user_id=user.id, meal_id=meal.id)
                 db.add(order)
             order.extension_plan_id = plan.id
-            change_extension(db, plan, 1)
+            order.extension_credit = not date_already_credited
+            if not date_already_credited:
+                change_extension(db, plan, 1)
             order.status = "skipped"
             order.extra_cost = 0
             order.extra_items = None
     if apply:
         db.commit()
     if apply:
-        message = f"Pause saved for {len(covered_dates)} date(s). Meals published later on these dates will be skipped automatically."
+        date_word = "date" if len(covered_dates) == 1 else "dates"
+        message = f"Pause saved for {len(covered_dates)} {date_word}. Meals published later on these dates will be skipped automatically."
         if eligible:
-            message += f" {len(eligible)} published meal(s) skipped; {len(eligible)} subscription day(s) added."
+            meal_word = "meal" if len(eligible) == 1 else "meals"
+            day_word = "day" if extension_days == 1 else "days"
+            message += f" {len(eligible)} published {meal_word} skipped; {extension_days} subscription {day_word} added."
     else:
-        message = f"You can pause {len(covered_dates)} date(s), even before menus are published. Future meals on these dates will be skipped automatically."
+        date_word = "date" if len(covered_dates) == 1 else "dates"
+        message = f"You can pause {len(covered_dates)} {date_word}, even before menus are published. Future meals on these dates will be skipped automatically."
     saved_dates = [p.date for p in db.query(models.MealDatePause).filter(
         models.MealDatePause.user_id == user.id, models.MealDatePause.active == True,
         models.MealDatePause.date >= date.today()).order_by(models.MealDatePause.date).all()]
@@ -252,7 +286,7 @@ def pause_result(body, db, user, apply=False):
         "paused_dates": sorted(covered_dates) if apply else [], "saved_dates": saved_dates,
         "new_pause_dates": len(new_dates), "covered_days": len(covered_dates),
         "skipped": len(eligible) if apply else 0, "eligible_count": len(eligible), "meals": eligible,
-        "unchanged": unchanged, "published_count": len(meals), "extension_days": len(eligible), "deductions": 0}
+        "unchanged": unchanged, "published_count": len(meals), "extension_days": extension_days, "deductions": 0}
 
 
 
@@ -294,6 +328,8 @@ def eligible(db: Session = Depends(get_db), user=Depends(customer)):
 
 @router.post("/reviews")
 def review(body: ReviewInput, db: Session = Depends(get_db), user=Depends(customer)):
+    if not lock_customer(db, user.id):
+        raise HTTPException(404, "Customer not found")
     if body.meal_id not in {m["id"] for m in eligible(db, user)}:
         raise HTTPException(400, "You can review past meals covered by your subscription that you did not skip")
     item = db.query(models.Feedback).filter_by(user_id=user.id, meal_id=body.meal_id).first()

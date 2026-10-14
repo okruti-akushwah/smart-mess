@@ -10,6 +10,8 @@ from app.routes.join_routes import invite, find_invite
 from app.tenancy import public_db
 from app.routes.discovery_routes import customer
 
+BUSINESS_FIELDS = {'tagline', 'business_type', 'operating_days', 'opening_time', 'city', 'food_type', 'service_type', 'owner_name', 'closing_time', 'area', 'business_status', 'fssai_number'}
+
 router = APIRouter(tags=['public mess page'])
 
 
@@ -26,6 +28,19 @@ class TimingInput(BaseModel):
 
 
 class ProfileInput(BaseModel):
+    owner_name: str = Field(default='', max_length=100)
+    business_type: str = Field(default='', max_length=100)
+    tagline: str = Field(default='', max_length=150)
+    food_type: str = Field(default='', max_length=100)
+    service_type: str = Field(default='', max_length=100)
+    operating_days: str = Field(default='', max_length=100)
+    opening_time: str = Field(default='', pattern=r'^$|^([01]\d|2[0-3]):[0-5]\d$')
+    closing_time: str = Field(default='', pattern=r'^$|^([01]\d|2[0-3]):[0-5]\d$')
+    city: str = Field(default='', max_length=100)
+    area: str = Field(default='', max_length=100)
+    fssai_number: str = Field(default='', pattern=r'^$|^[0-9]{14}$')
+    business_status: Literal['', 'Active', 'Temporarily closed', 'Closed'] = ''
+
     name_hi: str = Field(default="", max_length=100)
     about_hi: str = Field(default="", max_length=2000)
     preparation_hi: str = Field(default="", max_length=3000)
@@ -46,7 +61,7 @@ class ProfileInput(BaseModel):
             raise ValueError('Each meal timing can only appear once')
         return value
 
-    @field_validator('name', 'address', 'contact', 'hours', 'about', 'preparation', 'name_hi', 'about_hi', 'preparation_hi', 'address_hi')
+    @field_validator('name', 'address', 'contact', 'hours', 'about', 'preparation', 'name_hi', 'about_hi', 'preparation_hi', 'address_hi', 'owner_name', 'business_type', 'tagline', 'food_type', 'service_type', 'operating_days', 'city', 'area')
     @classmethod
     def trim(cls, value):
         return value.strip()
@@ -74,7 +89,7 @@ def save_profile(body: ProfileInput, db: Session = Depends(get_db), owner=Depend
         item = models.MessProfile(owner_id=owner.id)
         db.add(item)
     for field, value in body.model_dump(exclude={"timings"}).items():
-        if field.endswith("_hi") and field not in body.model_fields_set:
+        if (field.endswith("_hi") or field in BUSINESS_FIELDS) and field not in body.model_fields_set:
             continue
         setattr(item, field, value)
     if body.timings is not None:

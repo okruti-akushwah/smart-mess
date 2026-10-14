@@ -47,12 +47,11 @@ export default function NotificationSound({ role }) {
           ids = data.filter(b => !b.seen && b.status !== 'cancelled').map(b => `bill:${b.id}`);
         } else {
           const responses = await Promise.allSettled([
-            api.get('/owner/join-requests'), api.get('/owner/requests'),
-            api.get('/payments/submissions'), api.get('/owner/personal-orders'),
+            api.get('/owner/join-requests'), api.get('/payments/submissions'), api.get('/owner/personal-orders'),
           ]);
           if (responses.some(r => r.status === 'rejected')) return;
-          const [joins, plans, payments, orders] = responses.map(r => r.value.data);
-          ids = [...joins.map(r => `join:${r.id}`), ...plans.map(r => `plan:${r.id}`),
+          const [joins, payments, orders] = responses.map(r => r.value.data);
+          ids = [...joins.map(r => `join:${r.id}`),
             ...payments.filter(r => r.status === 'pending').map(r => `payment:${r.id}`),
             ...orders.filter(r => r.status === 'pending_acceptance' && !r.accepted).map(r => `order:${r.plan_id}`)];
         }

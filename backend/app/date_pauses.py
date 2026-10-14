@@ -5,6 +5,17 @@ from app.meal_coverage import covers
 from app.subscription_extensions import lock_customer, change_extension
 
 
+def has_skipped_meal_for_date(db, user_id, plan_id, meal_date):
+    return db.query(models.MealOrder.id).join(
+        models.Meal, models.MealOrder.meal_id == models.Meal.id
+    ).filter(
+        models.MealOrder.user_id == user_id,
+        models.MealOrder.extension_plan_id == plan_id,
+        models.MealOrder.status == "skipped",
+        models.Meal.date == meal_date,
+    ).first() is not None
+
+
 def lock_mess(db):
     owner_id = db.info.get("mess_owner_id")
     if owner_id:
@@ -30,9 +41,12 @@ def apply_date_pauses(db, meal):
         delivery = db.query(models.DeliveryUpdate).filter_by(user_id=pause.user_id, meal_id=meal.id).first()
         if delivery and delivery.status in ("out_for_delivery", "delivered"):
             continue
+        add_extension_day = not has_skipped_meal_for_date(db, pause.user_id, plan.id, meal.date)
         order = order or models.MealOrder(user_id=pause.user_id, meal_id=meal.id)
         order.status, order.extra_cost, order.extra_items = "skipped", 0, None
         order.extension_plan_id = plan.id
+        order.extension_credit = add_extension_day
         db.add(order)
-        change_extension(db, plan, 1)
+        if add_extension_day:
+            change_extension(db, plan, 1)
         db.flush()

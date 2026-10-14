@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import api, { errorMessage } from "../services/api";
 import { useTranslation } from "../i18n/useTranslation";
 
-export default function SignupOtp({ phone, joinToken, onVerified, onBack, inline = false, autoSend = false }) {
+export default function SignupOtp({ phone, joinToken, role = "owner", onVerified, onBack, inline = false, autoSend = false }) {
   const translate = useTranslation();
   const [challenge, setChallenge] = useState(null);
   const [code, setCode] = useState("");
@@ -31,7 +31,7 @@ export default function SignupOtp({ phone, joinToken, onVerified, onBack, inline
     attempted.current = true;
     setBusy(true); setError("");
     try {
-      const { data } = await api.post("/auth/signup/otp", { phone, join_token: joinToken || null });
+      const { data } = await api.post("/auth/signup/otp", { phone, join_token: joinToken || null, role });
       if (!data.otp_required) await onVerified(null);
       else { setChallenge({ ...data, resendAt: Date.now() + data.resend_after * 1000 }); setCode(""); }
     } catch (err) { setError(errorMessage(err)); }

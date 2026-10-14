@@ -2,62 +2,80 @@ import useSignupSettings from "../services/useSignupSettings";
 import SignupOtp from "../components/SignupOtp";
 import { useTranslation } from "../i18n/useTranslation";
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams, useLocation } from "react-router-dom";
+import { returnTo, loginUrl } from "../services/authRouting";
 import api, { errorMessage } from "../services/api";
 
 export default function Signup() {
   const translate = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const [role, setRole] = useState(() => searchParams.get("role") === "owner" ? "owner" : "customer");
   const [form, setForm] = useState({ name: "", mess_name: "", phone: "", password: "" });
   const [verification, setVerification] = useState(null);
   const { settings, settingsError } = useSignupSettings();
   const demo = settings?.demo_registration === true;
-  const phoneReady = /^[0-9]{10}$/.test(form.phone) && (demo || verification?.phone === form.phone);
+  const phoneReady = /^[0-9]{10}$/.test(form.phone) && (demo || verification?.phone === form.phone && verification.role === role);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const chooseRole = value => {setRole(value);setVerification(null);setError("");};
   const submit = async event => {
     event.preventDefault();
     if (!phoneReady) { setError("Verify your mobile number first."); return; }
     setLoading(true);setError("");
     try {
-      await api.post("/auth/signup", { ...form, role: "owner", verification_id: demo ? null : verification.id });
-      navigate("/owner/login", { replace: true, state: { message: "Mess created. Log in with your phone and password." } });
+      await api.post("/auth/signup", { ...form, role, verification_id: demo ? null : verification.id });
+      if (role === "owner") {
+        navigate("/login", { replace: true, state: { message: "Mess created. Log in with your phone and password." } });
+      } else {
+        const {data} = await api.post("/auth/login", {phone: form.phone, password: form.password});
+        localStorage.setItem("token", data.access_token);
+        localStorage.setItem("role", data.role);
+        localStorage.removeItem("activeMessToken");
+        navigate(returnTo(location), {replace: true});
+      }
     } catch (err) {
-      setError(errorMessage(err, "Unable to set up mess."));
+      setError(errorMessage(err, "Unable to create your account."));
       if (err.response?.status === 403) setVerification(null);
-    } finally
-    {setLoading(false);}
+    } finally {setLoading(false);}
   };
-  const change = (event) => setForm({ ...form, [event.target.name]: event.target.value });
+
   return <div className="auth-layout">
     <section className="auth-hero"><div className="auth-hero-content">
       <div className="hero-logo">{translate("M")}</div><h1>{translate("Smart Mess")}</h1>
-      <h2>{translate("Your mess, connected.")}</h2>
-      <p>{translate("Meals, subscriptions and payments in one place.")}</p>
+      <h2>{translate(role === "owner" ? "Your mess, connected." : "Good food, all in one place.")}</h2>
+      <p>{translate(role === "owner" ? "Set up your kitchen and welcome members to your mess." : "One member account lets you find messes and request access to the ones that fit your day.")}</p>
     </div></section>
     <section className="auth-form-side"><div className="auth-card">
-      <p className="eyebrow">{translate("OWNER REGISTRATION")}</p>
-        <h2>{translate("Set up your mess")}</h2>
-        <p>{translate(demo ? "Create your demo owner account. SMS verification is disabled; your mobile number remains unverified." : "Verify your mobile number first, then add your mess and account details.")}</p>
-        {!demo && <div className="signup-steps"><strong>{translate("1. Verify mobile")}</strong><span>{translate("2. Account details")}</span></div>}
-        {settingsError && <p className="alert error" role="alert">{translate(settingsError)}</p>}
-        <form onSubmit={submit}>
-          <label htmlFor="owner-phone">{translate("Phone number / login ID")}</label>
-          <input id="owner-phone" name="phone" type="tel" inputMode="numeric" autoComplete="tel-national" pattern="[0-9]{10}" maxLength={10} value={form.phone} onChange={event => {setForm({ ...form, phone: event.target.value.replace(/[^0-9]/g, "") });setVerification(null);setError("");}} required disabled={loading} />
-          {phoneReady ? <p className="phone-verified" role="status">{translate(demo ? "Demo registration · Mobile number unverified" : "✓ Mobile number verified")}</p> : settings && /^[0-9]{10}$/.test(form.phone) ? <SignupOtp key={form.phone} phone={form.phone} inline autoSend onVerified={async id => setVerification({ id, phone: form.phone })} /> : <p className="phone-hint">{translate(!settings ? "Loading registration settings…" : demo ? "Enter your 10-digit mobile number. No SMS is sent in demo mode." : "Enter 10 digits. We’ll request your OTP automatically.")}</p>}
-          {phoneReady && <>
-          <label htmlFor="owner-name">{translate("Your name")}</label>
-          <input id="owner-name" name="name" value={form.name} onChange={change} required maxLength={100} />
-          <label htmlFor="mess-name">{translate("Mess name")}</label>
-          <input id="mess-name" name="mess_name" value={form.mess_name} onChange={change} required maxLength={100} placeholder={translate("e.g. Sharma Tiffin Centre")} />
-          <label htmlFor="owner-password">{translate("Password")}</label>
-          <input id="owner-password" name="password" type="password" maxLength={72} value={form.password} onChange={change} required autoComplete="new-password" />
-          <button type="submit" className="btn btn-primary btn-full" disabled={loading}>{translate(loading ? "Creating mess..." : "Register your mess")}</button>
-          </>}
-        </form>
+      <p className="eyebrow">{translate("CREATE YOUR ACCOUNT")}</p>
+      <h2>{translate("Join Smart Mess")}</h2>
+      <label htmlFor="account-type">{translate("I am joining as")}</label>
+      <select id="account-type" value={role} disabled={loading} onChange={event => chooseRole(event.target.value)}>
+        <option value="customer">{translate("Member")}</option>
+        <option value="owner">{translate("Mess owner")}</option>
+      </select>
+      <p>{translate(demo ? "Demo registration: SMS verification is disabled and your mobile number remains unverified." : "Verify your mobile number, then finish your account details.")}</p>
+      {!demo && <div className="signup-steps"><strong>{translate("1. Verify mobile")}</strong><span>{translate("2. Account details")}</span></div>}
+      {settingsError && <p className="alert error" role="alert">{translate(settingsError)}</p>}
+      <form onSubmit={submit}>
+        <label htmlFor="signup-phone">{translate("Phone number / login ID")}</label>
+        <input id="signup-phone" name="phone" type="tel" inputMode="numeric" autoComplete="tel-national" pattern="[0-9]{10}" maxLength={10} value={form.phone} onChange={event => {setForm({ ...form, phone: event.target.value.replace(/[^0-9]/g, "") });setVerification(null);setError("");}} required disabled={loading} />
+        {phoneReady ? <p className="phone-verified" role="status">{translate(demo ? "Demo registration · Mobile number unverified" : "✓ Mobile number verified")}</p> : settings && /^[0-9]{10}$/.test(form.phone) ? <SignupOtp key={`${form.phone}-${role}`} phone={form.phone} role={role} inline autoSend onVerified={async id => setVerification({ id, phone: form.phone, role })} /> : <p className="phone-hint">{translate(!settings ? "Loading registration settings…" : demo ? "Enter your 10-digit mobile number. No SMS is sent in demo mode." : "Enter 10 digits. We’ll request your OTP automatically.")}</p>}
+        {phoneReady && <>
+          <label htmlFor="signup-name">{translate("Your name")}</label>
+          <input id="signup-name" name="name" value={form.name} onChange={event => setForm({ ...form, name: event.target.value })} required maxLength={100} disabled={loading} />
+          {role === "owner" && <><label htmlFor="signup-mess-name">{translate("Mess name")}</label><input id="signup-mess-name" name="mess_name" value={form.mess_name} onChange={event => setForm({ ...form, mess_name: event.target.value })} required maxLength={100} placeholder={translate("e.g. Sharma Tiffin Centre")} disabled={loading} /></>}
+          <label htmlFor="signup-password">{translate("Password")}</label>
+          <input id="signup-password" name="password" type="password" minLength={8} maxLength={72} value={form.password} onChange={event => setForm({ ...form, password: event.target.value })} required autoComplete="new-password" aria-describedby="signup-password-help" disabled={loading} />
+          <p id="signup-password-help">{translate("New passwords must contain at least 8 characters.")}</p>
+          <button type="submit" className="btn btn-primary btn-full" disabled={loading}>{translate(loading ? "Creating account…" : role === "owner" ? "Register your mess" : "Create member account")}</button>
+        </>}
+      </form>
       {error && <div className="alert error" role="alert">{translate(error)}</div>}
-      <p className="auth-footer">{translate("Already registered? ")}<Link to="/owner/login">{translate("Login")}</Link></p>
-      <p className="auth-footer"><Link to="/">{translate("View messes")}</Link></p>
+      <p className="auth-footer">{translate("Already have an account?")} <Link to={loginUrl(returnTo(location))}>{translate("Sign in")}</Link></p>
+      <p className="auth-footer"><Link to="/">{translate("Explore messes")}</Link></p>
     </div></section>
   </div>;
 }

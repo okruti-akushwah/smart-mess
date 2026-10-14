@@ -3,12 +3,14 @@ from datetime import date
 from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app import models
 from app.database import get_db
 from app.routes.discovery_routes import customer
 from app.routes.owner_meal_routes import require_owner
 from app.routes.billing_routes import get_current_bill
+from app.subscription_extensions import lock_customer
 from app.auth import get_current_user
 from app.payment_uploads import PAYMENT_IMAGE_DIR
 from fastapi.responses import HTMLResponse
@@ -153,6 +155,15 @@ def account_balances(db: Session = Depends(get_db), owner=Depends(require_owner)
     return result
 
 
+@router.get("/owner/payments/summary")
+def owner_payment_summary(db: Session = Depends(get_db), owner=Depends(require_owner)):
+    total, count = db.query(
+        func.coalesce(func.sum(models.PaymentRecord.amount), 0),
+        func.count(models.PaymentRecord.id),
+    ).one()
+    return {"total_received": float(total or 0), "payment_count": count or 0}
+
+
 class PaymentInput(BaseModel):
     plan_id: int
     amount: Decimal = Field(gt=0, le=100000, max_digits=12, decimal_places=2)
@@ -162,7 +173,12 @@ class PaymentInput(BaseModel):
 
 @router.post("/owner/payments", status_code=201)
 def record_payment(body: PaymentInput, db: Session = Depends(get_db), owner=Depends(require_owner)):
-    plan = db.query(models.MealPlan).filter_by(id=body.plan_id).with_for_update().first()
+    plan = db.query(models.MealPlan).filter_by(id=body.plan_id).first()
+    customer_id = plan.user_id if plan else None
+    db.rollback()  # Release the lookup snapshot before the SQLite write lock.
+    if customer_id is not None and not lock_customer(db, customer_id):
+        raise HTTPException(409, "Subscription customer is unavailable")
+    plan = db.query(models.MealPlan).filter_by(id=body.plan_id).populate_existing().with_for_update().first()
     if not plan or (not plan.purchase_key and (not (plan.start_date <= date.today() <= plan.end_date) or plan.status != "active")) or plan.status == "cancelled":
         raise HTTPException(400, "Payments can be recorded for current active subscriptions")
     existing = db.query(models.PaymentRecord).filter_by(receipt_key=str(body.receipt_key)).first()

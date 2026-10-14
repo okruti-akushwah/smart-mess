@@ -8,6 +8,7 @@ from app import models
 from app.database import get_db
 from app.routes.discovery_routes import customer
 from app.routes.owner_meal_routes import require_owner
+from app.subscription_extensions import lock_customer
 
 router = APIRouter(tags=["delivery"])
 
@@ -99,6 +100,10 @@ class DispatchInput(BaseModel):
 
 @router.put("/owner/deliveries")
 def dispatch(body: DispatchInput, db: Session = Depends(get_db), owner=Depends(require_owner)):
+    # Owners can submit another mess's customer ID; preserve the scoped
+    # eligibility response while serializing any valid dispatch for that ID.
+    if not lock_customer(db, body.user_id, all_messes=True):
+        raise HTTPException(400, "Only today's subscribed, non-skipped meals can be dispatched")
     row = next((r for r in deliveries_for(date.today(), db) if r["user_id"] == body.user_id and r["meal_id"] == body.meal_id), None)
     if not row:
         raise HTTPException(400, "Only today's subscribed, non-skipped meals can be dispatched")

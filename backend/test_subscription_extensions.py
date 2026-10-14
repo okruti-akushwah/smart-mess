@@ -34,7 +34,7 @@ class SubscriptionExtensionTests(unittest.TestCase):
         self.assertEqual(restored['end_date'],original['end_date'])
         self.assertEqual(restored['skip_count'],0)
 
-    def test_pause_multiple_meals_adds_one_day_each_and_cutoffs_block_actions(self):
+    def test_pause_multiple_meals_adds_one_day_for_the_date_and_cutoffs_block_actions(self):
         self.plan()
         lunch = self.meal()
         self.meal(meal_type='dinner')
@@ -44,9 +44,50 @@ class SubscriptionExtensionTests(unittest.TestCase):
         body = {'start_date':lunch['date'],'end_date':lunch['date']}
         result = self.client.post('/subscriptions/pause',headers=self.customer,json=body)
         self.assertEqual(result.status_code,200,result.text)
-        self.assertEqual(result.json()['extension_days'],2)
-        self.assertEqual(self.client.get('/subscriptions/current',headers=self.customer).json()[0]['skip_count'],2)
+        self.assertEqual(result.json()['extension_days'],1)
+        self.assertEqual(self.client.get('/subscriptions/current',headers=self.customer).json()[0]['skip_count'],1)
         self.assertEqual(self.client.post('/subscriptions/pause',headers=self.customer,json=body).json()['skipped'],0)
+
+    def test_two_paused_dates_with_two_meals_each_add_two_days(self):
+        self.plan()
+        start = date.today() + timedelta(days=1)
+        end = start + timedelta(days=1)
+        for offset in range(2):
+            self.meal(days=offset + 1, meal_type='lunch')
+            self.meal(days=offset + 1, meal_type='dinner')
+        original_end = self.client.get('/subscriptions/current', headers=self.customer).json()[0]['end_date']
+
+        result = self.client.post('/subscriptions/pause', headers=self.customer, json={
+            'start_date': start.isoformat(), 'end_date': end.isoformat(),
+        })
+
+        self.assertEqual(result.status_code, 200, result.text)
+        self.assertEqual(result.json()['skipped'], 4)
+        self.assertEqual(result.json()['extension_days'], 2)
+        self.assertIn('4 published meals skipped; 2 subscription days added.', result.json()['message'])
+        current = self.client.get('/subscriptions/current', headers=self.customer).json()[0]
+        self.assertEqual(current['skip_count'], 2)
+        self.assertEqual(current['skipped_meals'], 4)
+        self.assertEqual(current['end_date'], (date.fromisoformat(original_end) + timedelta(days=2)).isoformat())
+
+    def test_undo_pause_meals_removes_one_day_after_last_meal_on_date(self):
+        self.plan()
+        lunch = self.meal()
+        dinner = self.meal(meal_type='dinner')
+        original_end = self.client.get('/subscriptions/current', headers=self.customer).json()[0]['end_date']
+        body = {'start_date': lunch['date'], 'end_date': lunch['date']}
+        self.client.post('/subscriptions/pause', headers=self.customer, json=body)
+
+        first_undo = self.client.post('/meals/undo-skip', headers=self.customer, json={'meal_id': lunch['id']})
+        self.assertEqual(first_undo.status_code, 200, first_undo.text)
+        current = self.client.get('/subscriptions/current', headers=self.customer).json()[0]
+        self.assertEqual(current['skip_count'], 1)
+
+        second_undo = self.client.post('/meals/undo-skip', headers=self.customer, json={'meal_id': dinner['id']})
+        self.assertEqual(second_undo.status_code, 200, second_undo.text)
+        current = self.client.get('/subscriptions/current', headers=self.customer).json()[0]
+        self.assertEqual(current['skip_count'], 0)
+        self.assertEqual(current['end_date'], original_end)
 
     def test_future_subscription_moves_without_overlap_and_restores_on_undo(self):
         self.plan()

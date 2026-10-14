@@ -3,9 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.menu_images import IMAGE_DIR
 from app.payment_uploads import PAYMENT_IMAGE_DIR
-from app.migrations import add_menu_image_column, add_skip_deduction_column, add_guest_count_column, add_plan_offer_column, add_mess_ownership, add_customer_checkout, add_profile_languages, add_subscription_extensions, add_plan_meal_types
+from contextlib import asynccontextmanager
+from app.migrate import require_current_schema
 
-from app.database import engine, Base
+from app.database import engine
 
 from app.routes import (
     auth_routes,
@@ -21,6 +22,7 @@ from app.routes import (
     join_routes,
     profile_routes,
     catalog_routes,
+    weekly_menu_routes,
 )
 
 
@@ -28,21 +30,14 @@ from app.routes import (
 # DATABASE
 # =========================================================
 
-Base.metadata.create_all(bind=engine)
-add_menu_image_column(engine)
-add_skip_deduction_column(engine)
-add_guest_count_column(engine)
-add_plan_offer_column(engine)
-add_customer_checkout(engine)
-add_subscription_extensions(engine)
-add_plan_meal_types(engine)
-add_profile_languages(engine)
-add_mess_ownership(engine)
-from sqlalchemy.orm import Session
-from app.installation import initialize
-with Session(engine) as setup_db:
-    initialize(setup_db)
 from app import tenancy  # Register request-local ORM isolation hooks.
+
+
+@asynccontextmanager
+async def lifespan(app):
+    # Read-only verification; migrations are a separate deployment operation.
+    require_current_schema(engine)
+    yield
 
 
 # =========================================================
@@ -50,7 +45,7 @@ from app import tenancy  # Register request-local ORM isolation hooks.
 # =========================================================
 
 app = FastAPI(
-    title="Smart Mess & Tiffin Manager API"
+    title="Smart Mess & Tiffin Manager API", lifespan=lifespan
 )
 
 
@@ -82,6 +77,7 @@ app.include_router(meal_routes.router)
 app.include_router(billing_routes.router)
 app.include_router(dashboard_routes.router)
 app.include_router(owner_meal_routes.router)
+app.include_router(weekly_menu_routes.router)
 app.include_router(plan_routes.router)
 app.include_router(image_routes.router)
 app.include_router(discovery_routes.router)

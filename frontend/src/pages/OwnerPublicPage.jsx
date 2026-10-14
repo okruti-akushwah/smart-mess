@@ -12,7 +12,7 @@ export default function OwnerPublicPage() {
       <section className="welcome owner-welcome">
         <div><p className="eyebrow">{translate("STEP 1 · INTRODUCE YOUR MESS")}</p>
           <h1>{translate("Make your mess easy to discover.")}</h1>
-          <p>{translate("Add your address, contact details and meal timings, then preview the page your customers will see.")}</p>
+          <p>{translate("Add your address, contact details and meal timings, then preview the page your members will see.")}</p>
         </div>
         <Link className="btn btn-outline" to="/owner">{translate("Back to dashboard")}</Link>
       </section>

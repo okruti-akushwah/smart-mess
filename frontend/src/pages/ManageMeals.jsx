@@ -6,6 +6,7 @@ import MenuImage from "../components/MenuImage";
 import MenuPhotoEditor from "../components/MenuPhotoEditor";
 import Navbar from "../components/Navbar";
 import api, { errorMessage } from "../services/api";
+import WeeklyMenuEditor from "../components/WeeklyMenuEditor";
 
 function ManageMeals() {
   const translate = useTranslation();
@@ -59,6 +60,11 @@ function ManageMeals() {
   useEffect(() => {
     const timer = setTimeout(() => {loadMeals();}, 0);
     return () => clearTimeout(timer);
+  }, [loadMeals]);
+
+  useEffect(() => {
+    window.addEventListener("meals-updated", loadMeals);
+    return () => window.removeEventListener("meals-updated", loadMeals);
   }, [loadMeals]);
 
   useEffect(() => {
@@ -233,17 +239,17 @@ function ManageMeals() {
     <>
       <Navbar title={translate("Manage Meals")} />
 
-      <main className="dashboard">
+      <main className="dashboard owner-weekly-menu-page">
 
         <section className="welcome">
           <div>
-            <p className="eyebrow">{translate(" OWNER CONTROL ")}
+            <p className="eyebrow">{translate("OWNER CONTROL")}
 
             </p>
 
-            <h1>{translate("Manage Meals")}</h1>
+            <h1>{translate("Your weekly menu")}</h1>
 
-            <p>{translate(" Create and manage meals for your customers. ")}
+            <p>{translate("Set your menu once for the week. Upcoming meals repeat automatically, and you can update the schedule any time.")}
 
 
             </p>
@@ -259,6 +265,10 @@ function ManageMeals() {
           </button>
         </section>
 
+        <WeeklyMenuEditor />
+
+        <details className="one-time-meal-tools">
+          <summary>{translate("Manage one-time date changes")}</summary>
         <section className="management-card">
 
           <div className="section-heading">
@@ -333,7 +343,7 @@ function ManageMeals() {
               
             </div>
 
-            <label className="form-field">Single-meal price (₹)<input type="number" name="single_price" min="0.01" max="10000" step="0.01" value={form.single_price} onChange={handleChange} placeholder="e.g. 120" /><small>Leave blank to disable single-meal ordering. Customers without a subscription can buy this meal at this price.</small></label>
+            <label className="form-field">Single-meal price (₹)<input type="number" name="single_price" min="0.01" max="10000" step="0.01" value={form.single_price} onChange={handleChange} placeholder="e.g. 120" /><small>Leave blank to disable single-meal ordering. Members without a subscription can buy this meal at this price.</small></label>
             <MenuPhotoEditor menu={form.menu_description} imageUrl={form.image_url} onImage={acceptImage} onBusy={setGenerating} />
             <div className="form-actions">
 
@@ -446,6 +456,8 @@ function ManageMeals() {
             </div>
           }
         </section>
+
+        </details>
 
       </main>
     </>);

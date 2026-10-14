@@ -1,8 +1,20 @@
 from sqlalchemy import inspect, text
+from sqlalchemy.engine import Connection
+from contextlib import contextmanager
+
+
+@contextmanager
+def migration_transaction(bind):
+    """Join the versioned runner's transaction, or retain standalone helper use."""
+    if isinstance(bind, Connection):
+        yield bind
+    else:
+        with bind.begin() as connection:
+            yield connection
 
 
 def add_subscription_extensions(engine):
-    with engine.begin() as connection:
+    with migration_transaction(engine) as connection:
         for table, name, definition in (
             ("meal_plans", "original_start_date", "DATE"),
             ("meal_plans", "original_end_date", "DATE"),
@@ -18,8 +30,77 @@ def add_subscription_extensions(engine):
         connection.execute(text("UPDATE meal_plans SET accepted = TRUE WHERE meal_id IS NOT NULL AND status = 'active'"))
 
 
+def add_pause_date_credit(engine):
+    """Preserve existing meal credits while tracking per-date pause credits."""
+    with migration_transaction(engine) as connection:
+        columns = {c["name"] for c in inspect(connection).get_columns("meal_orders")}
+        if "extension_credit" not in columns:
+            connection.execute(text(
+                "ALTER TABLE meal_orders ADD COLUMN extension_credit BOOLEAN NOT NULL DEFAULT TRUE"
+            ))
+
+
+def add_weekly_menu(engine):
+    """Create weekly templates and link dated meal instances to their source entry."""
+    from app.models import WeeklyMenuEntry
+    with migration_transaction(engine) as connection:
+        WeeklyMenuEntry.__table__.create(connection, checkfirst=True)
+        columns = {c["name"] for c in inspect(connection).get_columns("meals")}
+        if "weekly_menu_entry_id" not in columns:
+            connection.execute(text(
+                "ALTER TABLE meals ADD COLUMN weekly_menu_entry_id INTEGER "
+                "REFERENCES weekly_menu_entries(id) ON DELETE SET NULL"
+            ))
+        columns = {c["name"] for c in inspect(connection).get_columns("meals")}
+        if "weekly_menu_override" not in columns:
+            connection.execute(text(
+                "ALTER TABLE meals ADD COLUMN weekly_menu_override BOOLEAN NOT NULL DEFAULT FALSE"
+            ))
+        connection.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_meals_weekly_menu_entry_id "
+            "ON meals (weekly_menu_entry_id)"
+        ))
+
+
+def allow_multi_mess_memberships(connection):
+    """Remove the legacy one-mess-per-account constraint and index memberships."""
+    inspector = inspect(connection)
+    if connection.dialect.name == "sqlite":
+        constraints = inspector.get_unique_constraints("join_requests")
+        if not any(item.get("column_names") == ["user_id"] for item in constraints):
+            connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_join_requests_owner_user ON join_requests (owner_id, user_id)"))
+            return
+        connection.exec_driver_sql("PRAGMA defer_foreign_keys=ON")
+        connection.execute(text("""CREATE TABLE join_requests_new (
+            id INTEGER NOT NULL PRIMARY KEY,
+            owner_id INTEGER NOT NULL REFERENCES users(id),
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            status VARCHAR NOT NULL,
+            created_at DATETIME
+        )"""))
+        connection.execute(text("INSERT INTO join_requests_new (id, owner_id, user_id, status, created_at) "
+                                "SELECT id, owner_id, user_id, status, created_at FROM join_requests"))
+        connection.execute(text("DROP TABLE join_requests"))
+        connection.execute(text("ALTER TABLE join_requests_new RENAME TO join_requests"))
+        connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_join_requests_owner_user ON join_requests (owner_id, user_id)"))
+        # DROP records deferred violations even after the replacement restores
+        # the parent rows. Validate the final schema before clearing that state.
+        violations = connection.exec_driver_sql("PRAGMA foreign_key_check").all()
+        if violations:
+            raise RuntimeError("Membership migration found invalid foreign key references")
+        connection.exec_driver_sql("PRAGMA defer_foreign_keys=OFF")
+        return
+
+    constraints = inspector.get_unique_constraints("join_requests")
+    for constraint in constraints:
+        if constraint.get("column_names") == ["user_id"] and constraint.get("name"):
+            quoted = connection.dialect.identifier_preparer.quote(constraint["name"])
+            connection.execute(text(f"ALTER TABLE join_requests DROP CONSTRAINT {quoted}"))
+    connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_join_requests_owner_user ON join_requests (owner_id, user_id)"))
+
+
 def add_customer_checkout(engine):
-    with engine.begin() as connection:
+    with migration_transaction(engine) as connection:
         for table, name, definition in (
             ("meals", "single_price", "NUMERIC(10, 2)"),
             ("meal_plans", "meal_id", "INTEGER REFERENCES meals(id)"),
@@ -33,7 +114,7 @@ def add_customer_checkout(engine):
 
 def add_menu_image_column(engine):
     """Add the nullable image field for existing SQLite/PostgreSQL installations."""
-    with engine.begin() as connection:
+    with migration_transaction(engine) as connection:
         columns = {column["name"] for column in inspect(connection).get_columns("meals")}
         if "image_url" not in columns:
             connection.execute(text("ALTER TABLE meals ADD COLUMN image_url VARCHAR"))
@@ -41,14 +122,14 @@ def add_menu_image_column(engine):
 
 def add_skip_deduction_column(engine):
     """Bring legacy plans up to date without replacing existing subscriptions."""
-    with engine.begin() as connection:
+    with migration_transaction(engine) as connection:
         columns = {column["name"] for column in inspect(connection).get_columns("meal_plans")}
         if "meal_price" not in columns:
             connection.execute(text("ALTER TABLE meal_plans ADD COLUMN meal_price NUMERIC(10, 2) DEFAULT 50"))
 
 
 def add_guest_count_column(engine):
-    with engine.begin() as connection:
+    with migration_transaction(engine) as connection:
         columns = {column["name"] for column in inspect(connection).get_columns("meal_orders")}
         if "guest_count" not in columns:
             connection.execute(text("ALTER TABLE meal_orders ADD COLUMN guest_count INTEGER NOT NULL DEFAULT 1"))
@@ -56,7 +137,7 @@ def add_guest_count_column(engine):
 
 def add_plan_offer_column(engine):
     """Preserve existing subscriptions while linking new ones to their catalogue plan."""
-    with engine.begin() as connection:
+    with migration_transaction(engine) as connection:
         columns = {column["name"] for column in inspect(connection).get_columns("meal_plans")}
         if "offer_id" not in columns:
             connection.execute(text("ALTER TABLE meal_plans ADD COLUMN offer_id INTEGER REFERENCES plan_offers(id)"))
@@ -67,7 +148,7 @@ def add_mess_ownership(engine):
     tables = ("meals", "plan_offers", "meal_plans", "meal_orders", "bills", "feedback",
               "plan_requests", "delivery_profiles", "delivery_updates", "payment_records",
               "payment_settings", "issued_bills", "payment_submissions", "join_selections", "guest_pricing")
-    with engine.begin() as connection:
+    with migration_transaction(engine) as connection:
         for table, column in [("users", "mess_owner_id"), *((t, "owner_id") for t in tables)]:
             columns = {c["name"] for c in inspect(connection).get_columns(table)}
             if column not in columns:
@@ -102,7 +183,7 @@ def add_mess_ownership(engine):
 
 
 def add_profile_languages(engine):
-    with engine.begin() as connection:
+    with migration_transaction(engine) as connection:
         columns = {column["name"] for column in inspect(connection).get_columns("mess_profiles")}
         for field in ("name_hi", "about_hi", "preparation_hi", "address_hi"):
             if field not in columns:
@@ -110,7 +191,16 @@ def add_profile_languages(engine):
 
 
 def add_plan_meal_types(engine):
-    with engine.begin() as connection:
+    with migration_transaction(engine) as connection:
         for table in ('plan_offers', 'meal_plans'):
             if 'meal_types' not in {c['name'] for c in inspect(connection).get_columns(table)}:
                 connection.execute(text(f"ALTER TABLE {table} ADD COLUMN meal_types JSON NOT NULL DEFAULT '[\"breakfast\", \"lunch\", \"dinner\"]'"))
+
+
+def add_business_details(engine):
+    """Add optional public business details without rewriting existing profiles."""
+    with migration_transaction(engine) as connection:
+        columns = {column["name"] for column in inspect(connection).get_columns("mess_profiles")}
+        for field in ('owner_name', 'business_type', 'tagline', 'food_type', 'service_type', 'operating_days', 'opening_time', 'closing_time', 'city', 'area', 'fssai_number', 'business_status'):
+            if field not in columns:
+                connection.execute(text(f"ALTER TABLE mess_profiles ADD COLUMN {field} VARCHAR DEFAULT ''"))

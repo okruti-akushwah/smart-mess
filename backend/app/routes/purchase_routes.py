@@ -9,9 +9,12 @@ from sqlalchemy.exc import IntegrityError
 from app import models
 from app.meal_coverage import covers, included_types
 from app.database import get_db
+from app.auth import get_current_identity
+from app.tenancy import scope
 from app.routes.discovery_routes import customer
 from app.routes.workflow_routes import bill_output
 from app.routes.owner_meal_routes import require_owner
+from app.subscription_extensions import lock_customer
 
 router = APIRouter(tags=["customer purchases"])
 
@@ -45,8 +48,8 @@ def purchase_output(plan, db):
 
 @router.post("/customer/checkout", status_code=201)
 def checkout(body: CheckoutInput, db: Session = Depends(get_db), user=Depends(customer)):
-    # Serialize checkouts for this customer on databases supporting row locks.
-    db.query(models.User).filter_by(id=user.id).with_for_update().first()
+    # Serialize customer checkouts on both PostgreSQL and SQLite.
+    lock_customer(db, user.id)
     profile = db.get(models.DeliveryProfile, user.id)
     if not profile or len(profile.address.strip()) < 10:
         raise HTTPException(409, "Add your delivery address before choosing a meal or plan")
@@ -64,15 +67,12 @@ def checkout(body: CheckoutInput, db: Session = Depends(get_db), user=Depends(cu
             raise HTTPException(422, "Choose today or a future start date")
         start, end = body.start_date, body.start_date + timedelta(days=offer.duration_days - 1)
         price, deduction, name = offer.price, offer.meal_price, offer.name
-        if db.query(models.PlanRequest).filter_by(user_id=user.id, status="pending").first():
-            raise HTTPException(409, "Cancel your previous plan request before checking out")
     else:
         meal = db.get(models.Meal, body.meal_id)
         if not meal:
             raise HTTPException(404, "Meal unavailable")
-        if meal.date != datetime.now(timezone(timedelta(hours=5, minutes=30))).date():
-            raise HTTPException(409, "Single meals can only be ordered from today's menu")
-        if meal.date < date.today() or (meal.cutoff_time and meal.cutoff_time.replace(tzinfo=timezone.utc) <= datetime.now(timezone.utc)):
+        local_today = datetime.now(timezone(timedelta(hours=5, minutes=30))).date()
+        if meal.date < local_today or (meal.cutoff_time and meal.cutoff_time.replace(tzinfo=timezone.utc) <= datetime.now(timezone.utc)):
             raise HTTPException(409, "Ordering for this meal has closed")
         if not meal.single_price:
             raise HTTPException(409, "Your owner has not enabled single-meal ordering for this meal")
@@ -115,11 +115,12 @@ def activate_paid_purchase(plan, db):
 
 @router.delete("/customer/checkout/{plan_id}")
 def cancel_checkout(plan_id: int, db: Session = Depends(get_db), user=Depends(customer)):
-    plan = db.query(models.MealPlan).filter_by(id=plan_id, user_id=user.id).with_for_update().first()
+    lock_customer(db, user.id)
+    plan = db.query(models.MealPlan).filter_by(id=plan_id, user_id=user.id).populate_existing().with_for_update().first()
     if not plan:
         raise HTTPException(404, "Checkout not found")
     bill = db.query(models.IssuedBill).filter_by(plan_id=plan.id).first()
-    if plan.status != "pending_payment" or db.query(models.PaymentRecord).filter_by(plan_id=plan.id).first() or db.query(models.PaymentSubmission).filter_by(bill_id=bill.id, status="pending").first():
+    if not bill or plan.status != "pending_payment" or db.query(models.PaymentRecord).filter_by(plan_id=plan.id).first() or db.query(models.PaymentSubmission).filter_by(bill_id=bill.id, status="pending").first():
         raise HTTPException(409, "A paid purchase or payment awaiting confirmation cannot be cancelled here. Contact your owner.")
     plan.status = "cancelled"
     db.commit()
@@ -154,6 +155,32 @@ def activity(db: Session = Depends(get_db), user=Depends(customer)):
     submissions = [{"plan_id": bill_plans.get(s.bill_id), "id": s.id, "bill_id": s.bill_id, "amount": float(s.amount), "method": s.method,
         "status": s.status, "created_at": s.created_at} for s in db.query(models.PaymentSubmission).filter_by(user_id=user.id).order_by(models.PaymentSubmission.id.desc())]
     return {"meals": rows, "purchases": purchases, "receipts": receipts, "submissions": submissions}
+
+
+@router.get("/customer/account-activity")
+def account_activity(db: Session = Depends(get_db), user=Depends(get_current_identity)):
+    if user.role != "customer":
+        raise HTTPException(403, "Customer access required")
+    # Include historical orders even if a membership is no longer available.
+    owner_ids = {owner_id for model in (models.MealPlan, models.MealOrder)
+                 for (owner_id,) in db.query(model.owner_id).filter_by(user_id=user.id).distinct()
+                 if owner_id is not None}
+    result = {key: [] for key in ("meals", "purchases", "receipts", "submissions")}
+    for owner_id in sorted(owner_ids):
+        profile = db.get(models.MessProfile, owner_id)
+        owner = db.get(models.User, owner_id)
+        invite = db.get(models.JoinInvite, owner_id)
+        mess = {"owner_id": owner_id,
+                "mess_name": profile.name if profile and profile.name else f"{owner.name}’s mess" if owner else "Mess",
+                "join_token": invite.token if invite else None}
+        # Reuse the existing history calculation with isolation intact.
+        with Session(bind=db.get_bind()) as mess_db:
+            scope(mess_db, owner_id)
+            data = activity(mess_db, user)
+            for key in result:
+                result[key].extend({**row, **mess} for row in data[key])
+    result["meals"].sort(key=lambda row: (row["date"], row["id"]), reverse=True)
+    return result
 
 
 @router.get("/owner/personal-orders")

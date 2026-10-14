@@ -4,8 +4,9 @@ function normalise(value) { return value.replace(/\s+/g, ' ').trim().replace(/[�
 export function translateText(value, language) {
   if(language !== 'hi' || typeof value !== 'string' || !value.trim()) return value;
   const key=normalise(value);
-  const translated=lookup.get(key);
-  if(translated) return value.match(/^\s*/)[0]+translated+value.match(/\s*$/)[0];
+  const legacyMemberKey=key.replace(/\bmembers?\b/gi, word => ({ Member: "Customer", Members: "Customers", member: "customer", members: "customers", MEMBER: "CUSTOMER", MEMBERS: "CUSTOMERS" })[word] || word);
+  const translated=lookup.get(key) || lookup.get(legacyMemberKey);
+  if(translated) return value.match(/^\s*/)[0]+translated.replace(/ग्राहक/g, "सदस्य")+value.match(/\s*$/)[0];
   const patterns=[
     [/^Join (.+)$/, match => `${match[1]} से जुड़ें`],
     [/^About (.+)$/, match => `${match[1]} के बारे में`],

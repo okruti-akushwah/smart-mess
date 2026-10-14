@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Date, ForeignKey, Numeric, Boolean, DateTime, UniqueConstraint, JSON
+from sqlalchemy import Column, Integer, String, Date, ForeignKey, Numeric, Boolean, DateTime, UniqueConstraint, JSON, Index, text
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.database import Base
@@ -54,6 +54,7 @@ class MealPlan(Base):
 
 class Meal(Base):
     __tablename__ = "meals"
+    __table_args__ = (Index("uq_meals_owner_date_type", "owner_id", "date", "meal_type", unique=True),)
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
 
     id = Column(Integer, primary_key=True, index=True)
@@ -64,10 +65,28 @@ class Meal(Base):
     single_price = Column(Numeric(10, 2), nullable=True)
     is_complimentary = Column(Boolean, default=True)
     cutoff_time = Column(DateTime)
+    weekly_menu_entry_id = Column(Integer, ForeignKey("weekly_menu_entries.id", ondelete="SET NULL"), nullable=True)
+    weekly_menu_override = Column(Boolean, nullable=False, default=False, server_default="false")
+
+
+class WeeklyMenuEntry(Base):
+    __tablename__ = "weekly_menu_entries"
+    __table_args__ = (UniqueConstraint("owner_id", "weekday", "meal_type", name="uq_weekly_menu_owner_day_type"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    owner_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    weekday = Column(Integer, nullable=False)  # Monday = 0
+    meal_type = Column(String, nullable=False)
+    menu_description = Column(String, nullable=False)
+    image_url = Column(String, nullable=True)
+    single_price = Column(Numeric(10, 2), nullable=True)
+    is_complimentary = Column(Boolean, nullable=False, default=True, server_default="true")
+    cutoff_time = Column(String(5), nullable=True)  # UTC HH:MM, matching Meal.cutoff_time
 
 
 class MealOrder(Base):
     __tablename__ = "meal_orders"
+    __table_args__ = (Index("uq_meal_orders_user_meal", "user_id", "meal_id", unique=True),)
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
 
     id = Column(Integer, primary_key=True, index=True)
@@ -75,6 +94,7 @@ class MealOrder(Base):
     meal_id = Column(Integer, ForeignKey("meals.id"))
     status = Column(String, default="confirmed")  # "confirmed", "skipped", "guest_added"
     extension_plan_id = Column(Integer, ForeignKey("meal_plans.id"), nullable=True)
+    extension_credit = Column(Boolean, nullable=False, default=True, server_default="true")
     extra_items = Column(String, nullable=True)
     extra_cost = Column(Numeric(10, 2), default=0)
     guest_count = Column(Integer, nullable=False, default=1)
@@ -101,6 +121,7 @@ class Bill(Base):
 
 class Feedback(Base):
     __tablename__ = "feedback"
+    __table_args__ = (Index("uq_feedback_user_meal", "user_id", "meal_id", unique=True),)
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
 
     id = Column(Integer, primary_key=True, index=True)
@@ -148,6 +169,7 @@ class DeliveryProfile(Base):
 
 class DeliveryUpdate(Base):
     __tablename__ = "delivery_updates"
+    __table_args__ = (Index("uq_delivery_updates_user_meal", "user_id", "meal_id", unique=True),)
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -192,6 +214,9 @@ class IssuedBill(Base):
 
 class PaymentSubmission(Base):
     __tablename__ = "payment_submissions"
+    __table_args__ = (Index("uq_payment_submissions_pending_bill", "bill_id", unique=True,
+                             sqlite_where=text("status = 'pending'"),
+                             postgresql_where=text("status = 'pending'")),)
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -211,15 +236,28 @@ class JoinInvite(Base):
 
 class JoinRequest(Base):
     __tablename__ = "join_requests"
+    __table_args__ = (Index("uq_join_requests_owner_user", "owner_id", "user_id", unique=True),)
     id = Column(Integer, primary_key=True)
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     status = Column(String, default="pending", nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class MessProfile(Base):
     __tablename__ = "mess_profiles"
     owner_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
+    owner_name = Column(String, default="")
+    business_type = Column(String, default="")
+    tagline = Column(String, default="")
+    food_type = Column(String, default="")
+    service_type = Column(String, default="")
+    operating_days = Column(String, default="")
+    opening_time = Column(String, default="")
+    closing_time = Column(String, default="")
+    city = Column(String, default="")
+    area = Column(String, default="")
+    fssai_number = Column(String, default="")
+    business_status = Column(String, default="")
     name_hi = Column(String, default="")
     about_hi = Column(String, default="")
     preparation_hi = Column(String, default="")
@@ -283,6 +321,13 @@ class SignupChallenge(Base):
 class SignupOtpPhone(Base):
     __tablename__ = "signup_otp_phones"
     phone = Column(String(10), primary_key=True)
+
+
+class AuthAttemptBucket(Base):
+    __tablename__ = "auth_attempt_buckets"
+    key = Column(String(64), primary_key=True)
+    attempts = Column(Integer, nullable=False, default=0)
+    window_start = Column(DateTime, nullable=False)
 
 
 class MealDatePause(Base):

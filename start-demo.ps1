@@ -10,6 +10,8 @@ $env:SECRET_KEY = 'local-demo-only-secret'
 Write-Host 'Demo API uses port 8002. In another terminal, run:'
 Write-Host 'cd frontend; $env:VITE_API_URL="http://127.0.0.1:8002"; npm run dev -- --host 127.0.0.1 --port 5174 --strictPort'
 try {
+    & $demoPython (Join-Path $demoRoot 'backend/migrate_database.py') upgrade --allow-legacy-upgrade
+    if ($LASTEXITCODE -ne 0) { throw 'Demo schema migration failed; API was not started.' }
     & $demoPython -m uvicorn app.main:app --app-dir (Join-Path $demoRoot 'backend') --host 127.0.0.1 --port 8002
 } finally {
     $env:DATABASE_URL = $previousDemoDatabase

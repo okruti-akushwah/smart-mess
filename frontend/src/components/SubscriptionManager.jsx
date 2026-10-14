@@ -20,20 +20,20 @@ export default function SubscriptionManager() {
     try {
       await api.post("/owner/plans", { ...form, user_id: Number(form.user_id), price: Number(form.price), meal_price: Number(form.meal_price) });
       setForm(emptyForm());
-      setMessage("Subscription assigned awaiting payment. The customer can pay from Bills; meal bookings begin only after you confirm full payment.");
+      setMessage("Subscription assigned awaiting payment. The member can pay from Bills; meal bookings begin only after you confirm full payment.");
       window.dispatchEvent(new Event("subscription-updated"));
     } catch (e) {setError(errorMessage(e));} finally
     {setSaving(false);}
   }
   function change(event) {setForm({ ...form, [event.target.name]: event.target.value });}
   return <section className="management-card">
-    <p className="eyebrow">{translate("CUSTOMER SUBSCRIPTIONS")}</p><h2>{translate("Set up a meal plan")}</h2>
+    <p className="eyebrow">{translate("MEMBER SUBSCRIPTIONS")}</p><h2>{translate("Set up a meal plan")}</h2>
     <p className="muted">Assign a subscription and create its payment bill. It counts as taken and enters preparation totals only after you confirm full payment. A new assignment replaces an overlapping unpaid owner assignment when no payment is awaiting confirmation.</p>
     {error && <div className="alert error" role="alert">{translate(error)}</div>}
     {message && <div className="alert success" role="status">{translate(message)}</div>}
-    {!customers.length ? <p>{translate("No customers yet. Share your mess join link, then approve their requests in the Requests tab.")}</p> :
+    {!customers.length ? <p>{translate("No members yet. Share your mess join link, then approve their join requests in the Requests tab.")}</p> :
       <form className="meal-form" onSubmit={submit}>
-      <label className="form-field">{translate("Customer")}<select required name="user_id" value={form.user_id} onChange={change}><option value="">{translate("Choose a customer")}</option>{customers.map((c) => <option key={c.id} value={c.id}>{c.name} · {c.phone}</option>)}</select></label>
+      <label className="form-field">{translate("Member")}<select required name="user_id" value={form.user_id} onChange={change}><option value="">{translate("Choose a member")}</option>{customers.map((c) => <option key={c.id} value={c.id}>{c.name} · {c.phone}</option>)}</select></label>
       <label className="form-field">{translate("Plan amount (₹)")}<input required type="number" min="1" step="0.01" name="price" value={form.price} onChange={change} /></label>
       <fieldset className="form-field"><legend>Meals included</legend>{["breakfast", "lunch", "dinner"].map(type => <label key={type} className="plan-meal-option"><input type="checkbox" checked={form.meal_types.includes(type)} onChange={e => setForm(previous => ({ ...previous, meal_types: e.target.checked ? [...previous.meal_types, type] : previous.meal_types.filter(value => value !== type) }))} />{translate(type)}</label>)}{!form.meal_types.length && <p role="alert">Choose at least one meal.</p>}</fieldset><p className="muted">Each skipped meal adds one subscription day.</p>
       <label className="form-field">{translate("Starts on")}<input required type="date" name="start_date" value={form.start_date} onChange={change} /></label>

@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from app import models
 from app.meal_coverage import included_types
 from app.database import get_db
@@ -13,6 +14,7 @@ from app.auth import get_current_user
 from app.routes.owner_meal_routes import require_owner
 from app.routes.discovery_routes import customer
 from app.routes.billing_routes import get_current_bill
+from app.subscription_extensions import lock_customer
 
 router = APIRouter(tags=["bill workflow"])
 PROOF_DIR = Path(__file__).resolve().parents[2] / "payment_proofs"
@@ -74,14 +76,12 @@ def submission_output(s, db):
             "has_image": bool(s.image_name), "created_at": s.created_at}
 
 
-@router.post("/payments/submissions", status_code=201)
-async def submit_payment(bill_id: int = Form(...), amount: Decimal = Form(...),
-                         method: Literal["upi"] = Form(...), reference: str = Form(""),
-                         file: UploadFile | None = File(None), db: Session = Depends(get_db), user=Depends(customer)):
+def validate_submission(db, user, bill_id, amount, reference):
     bill = db.query(models.IssuedBill).filter_by(id=bill_id, user_id=user.id).first()
     if not bill:
         raise HTTPException(404, "Bill not found")
-    if db.get(models.MealPlan, bill.plan_id).status == "cancelled":
+    plan = db.get(models.MealPlan, bill.plan_id)
+    if not plan or plan.status == "cancelled":
         raise HTTPException(409, "This checkout was cancelled")
     if not amount.is_finite() or amount <= 0 or amount > Decimal(str(bill_output(bill, db)["balance_due"])) or amount.as_tuple().exponent < -2:
         raise HTTPException(422, "Enter a positive amount up to the bill balance with at most two decimals")
@@ -89,26 +89,43 @@ async def submit_payment(bill_id: int = Form(...), amount: Decimal = Form(...),
         raise HTTPException(422, "Reference must be at most 200 characters")
     if db.query(models.PaymentSubmission).filter_by(bill_id=bill_id, status="pending").first():
         raise HTTPException(409, "A payment for this bill is already awaiting owner review")
-    filename = None
-    if method == "upi":
-        if not file:
-            raise HTTPException(422, "Upload your payment screenshot")
-        content = await file.read(5 * 1024 * 1024 + 1)
-        await file.close()
-        if len(content) > 5 * 1024 * 1024:
-            raise HTTPException(413, "Screenshot must be smaller than 5 MB")
-        if content.startswith(b"\x89PNG\r\n\x1a\n") and content.endswith(b"IEND\xaeB`\x82"):
-            ext = ".png"
-        elif content.startswith(b"\xff\xd8\xff") and content.endswith(b"\xff\xd9"):
-            ext = ".jpg"
-        else:
-            raise HTTPException(422, "Upload a PNG or JPEG screenshot")
-        filename = uuid4().hex + ext
-        (PROOF_DIR / filename).write_bytes(content)
+    return bill
+
+
+@router.post("/payments/submissions", status_code=201)
+async def submit_payment(bill_id: int = Form(...), amount: Decimal = Form(...),
+                         method: Literal["upi"] = Form(...), reference: str = Form(""),
+                         file: UploadFile | None = File(None), db: Session = Depends(get_db), user=Depends(customer)):
+    validate_submission(db, user, bill_id, amount, reference)
+    db.rollback()  # Release the read snapshot before any upload wait or lock attempt.
+    if not file:
+        raise HTTPException(422, "Upload your payment screenshot")
+    content = await file.read(5 * 1024 * 1024 + 1)
+    await file.close()
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(413, "Screenshot must be smaller than 5 MB")
+    if content.startswith(b"\x89PNG\r\n\x1a\n") and content.endswith(b"IEND\xaeB`\x82"):
+        ext = ".png"
+    elif content.startswith(b"\xff\xd8\xff") and content.endswith(b"\xff\xd9"):
+        ext = ".jpg"
+    else:
+        raise HTTPException(422, "Upload a PNG or JPEG screenshot")
+    if not lock_customer(db, user.id):
+        raise HTTPException(404, "Customer not found")
+    bill = validate_submission(db, user, bill_id, amount, reference)
+    filename = uuid4().hex + ext
+    (PROOF_DIR / filename).write_bytes(content)
     submission = models.PaymentSubmission(user_id=user.id, bill_id=bill_id, amount=amount, method=method, reference=reference.strip(), image_name=filename)
     db.add(submission)
     try:
         db.commit()
+    except IntegrityError:
+        db.rollback()
+        if filename:
+            (PROOF_DIR / filename).unlink(missing_ok=True)
+        if db.query(models.PaymentSubmission).filter_by(bill_id=bill_id, status="pending").first():
+            raise HTTPException(409, "A payment for this bill is already awaiting owner review")
+        raise
     except Exception:
         db.rollback()
         if filename:
@@ -139,15 +156,28 @@ class Review(BaseModel):
 
 @router.patch("/owner/payment-submissions/{submission_id}")
 def review(submission_id: int, body: Review, db: Session = Depends(get_db), owner=Depends(require_owner)):
-    s = db.query(models.PaymentSubmission).filter_by(id=submission_id).with_for_update().first()
+    s = db.get(models.PaymentSubmission, submission_id)
+    if not s:
+        raise HTTPException(404, "Payment not found")
+    customer_id = s.user_id
+    db.rollback()  # Drop the discovery read snapshot before acquiring the write lock on SQLite.
+    if not lock_customer(db, customer_id):
+        raise HTTPException(409, "Payment customer is unavailable")
+    s = db.query(models.PaymentSubmission).filter_by(id=submission_id).populate_existing().with_for_update().first()
     if not s:
         raise HTTPException(404, "Payment not found")
     if s.status != "pending":
         if s.status == body.status:
             return {"message": "Already reviewed"}
         raise HTTPException(409, "Payment already reviewed")
+    if not db.query(models.IssuedBill).filter_by(id=s.bill_id, user_id=s.user_id).first():
+        raise HTTPException(409, "Payment bill is unavailable")
     bill = db.get(models.IssuedBill, s.bill_id)
-    plan = db.query(models.MealPlan).filter_by(id=bill.plan_id).with_for_update().first()
+    if not bill:
+        raise HTTPException(409, "Payment bill is unavailable")
+    plan = db.query(models.MealPlan).filter_by(id=bill.plan_id).populate_existing().with_for_update().first()
+    if not plan or plan.user_id != s.user_id:
+        raise HTTPException(409, "Payment subscription is unavailable")
     if body.status == "approved":
         # An issued bill remains payable after its subscription expires.
         latest = db.query(models.IssuedBill).filter_by(plan_id=plan.id).order_by(models.IssuedBill.id.desc()).first()

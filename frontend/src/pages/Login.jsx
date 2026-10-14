@@ -2,9 +2,10 @@ import { useTranslation } from "../i18n/useTranslation";
 import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 
+import { returnTo } from "../services/authRouting";
 import api, { errorMessage } from "../services/api";
 
-function Login({ ownerPortal = false }) {
+function Login() {
   const translate = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
@@ -24,18 +25,38 @@ function Login({ ownerPortal = false }) {
     });
   };
 
-  function completeLogin(data) {
+  async function completeLogin(data) {
     if (!data.access_token) throw new Error("Backend did not return an access token.");
     localStorage.setItem("token", data.access_token);
     localStorage.setItem("role", data.role);
     localStorage.removeItem("user");
-    const target = location.state?.from;
-    navigate(data.role === "owner" ? "/owner" : target?.startsWith("/customer") ? target : "/customer", { replace: true });
+    const target = returnTo(location);
+    if (data.role === "owner") {
+      localStorage.removeItem("activeMessToken");
+      const destination = location.state?.message === "Mess created. Log in with your phone and password."
+        ? "/owner/onboarding" : "/owner";
+      navigate(destination, { replace: true });
+      return;
+    }
+    if (target.startsWith("/join/") || target.startsWith("/mess/") || target === "/customer/history") {
+      navigate(target, {replace: true});
+      return;
+    }
+    const { data: memberships } = await api.get("/customer/messes");
+    const previousSelection = localStorage.getItem("activeMessToken");
+    const selected = memberships.find(item => item.join_token === previousSelection)
+      || (memberships.length === 1 ? memberships[0] : null);
+    if (selected?.join_token) localStorage.setItem("activeMessToken", selected.join_token);
+    else localStorage.removeItem("activeMessToken");
+    const destination = memberships.length > 1 && !selected
+      ? "/customer/messes"
+      : selected ? (target?.startsWith("/customer") && target !== "/customer/messes" ? target : "/customer") : "/";
+    navigate(destination, { replace: true, state: { from: target } });
   }
 
   const handleSubmit = async event => {
     event.preventDefault(); setLoading(true); setError("");
-    try { const { data } = await api.post("/auth/login", form); completeLogin(data); }
+    try { const { data } = await api.post("/auth/login", form); await completeLogin(data); }
     catch (err) { setError(errorMessage(err, "Unable to login.")); }
     finally { setLoading(false); }
   };
@@ -54,7 +75,7 @@ function Login({ ownerPortal = false }) {
 
           </h2>
 
-          <p>{translate(ownerPortal ? "Manage your kitchen, subscriptions and payments in one place." : "See your meals, manage skips and guests, and keep track of your bill.")}
+          <p>{translate("Manage your kitchen or explore meals, plans and bills. One sign-in takes you to the right place.")}
 
 
 
@@ -63,7 +84,7 @@ function Login({ ownerPortal = false }) {
           <div className="hero-features">
             <span>{translate("✓ Live meal management")}</span>
             <span>{translate("✓ Transparent billing")}</span>
-            <span>{translate(ownerPortal ? "✓ Smarter kitchen preparation" : "✓ Flexible meal planning")}</span>
+            <span>{translate("✓ Flexible meal planning")}</span>
           </div>
         </div>
       </section>
@@ -72,9 +93,9 @@ function Login({ ownerPortal = false }) {
         <div className="auth-card">
           <p className="eyebrow">{translate("WELCOME BACK")}</p>
 
-          <h2>{translate(ownerPortal ? "Mess owner login" : "Customer login")}</h2>
+          <h2>{translate("Sign in to Smart Mess")}</h2>
 
-          <p className="muted">{translate(" Enter your details to continue. ")}
+          <p className="muted">{translate("Use your phone and password. We’ll open your owner or member account automatically.")}
 
           </p>
 
@@ -88,13 +109,8 @@ function Login({ ownerPortal = false }) {
             <button className="btn btn-primary btn-full" type="submit" disabled={loading}>{translate(loading ? "Logging in..." : "Login")}</button>
           </form>
 
-          <p className="auth-footer">{translate(" New to Smart Mess?")}
-            {translate(" ")}
-            <Link to={ownerPortal ? "/owner/register" : "/signup"}>{translate(ownerPortal ? "Register your mess" : "Join your mess")}
-
-            </Link>
-          </p>
-          <p className="auth-footer"><Link to="/">{translate("View mess page")}</Link></p>
+          <p className="auth-footer">{translate("New to Smart Mess?")} <Link to={`/register?next=${encodeURIComponent(returnTo(location))}`}>{translate("Create an account")}</Link></p>
+          <p className="auth-footer"><Link to="/">{translate("Explore messes")}</Link></p>
         </div>
       </section>
     </div>);

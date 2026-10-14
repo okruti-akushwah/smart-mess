@@ -9,6 +9,7 @@ from app.database import get_db
 from app.menu_images import validate_image
 from app.menu_catalog import remember
 from app.date_pauses import lock_mess, apply_date_pauses
+from app.weekly_menu import sync_weekly_menu, weekly_menu_lock
 
 
 router = APIRouter(
@@ -33,6 +34,14 @@ def require_owner(
     return current_user
 
 
+def has_customer_activity(db: Session, meal_id: int) -> bool:
+    """Return whether customers have recorded an action tied to this meal."""
+    for model in (models.MealOrder, models.DeliveryUpdate, models.Feedback):
+        if db.query(model.id).filter(model.meal_id == meal_id).first():
+            return True
+    return False
+
+
 # =========================================================
 # GET ALL MEALS
 # =========================================================
@@ -45,6 +54,9 @@ def get_all_meals(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_owner),
 ):
+    with weekly_menu_lock(current_user.id):
+        sync_weekly_menu(db, current_user.id)
+        db.commit()
     meals = (
         db.query(models.Meal)
         .filter(models.Meal.date >= date.today())
@@ -115,6 +127,7 @@ def create_meal(
         cutoff_time=req.cutoff_time,
         image_url=req.image_url,
         single_price=req.single_price,
+        weekly_menu_override=True,
     )
 
     db.add(meal)
@@ -183,8 +196,10 @@ def update_meal(
 
     target_date = update_data.get("date", meal.date)
     target_type = update_data.get("meal_type", meal.meal_type)
-    if (target_date != meal.date or target_type != meal.meal_type) and db.query(models.MealPlan).filter_by(meal_id=meal_id).first():
-        raise HTTPException(409, "This meal has bookings. Keep its date and meal type unchanged.")
+    if target_date != meal.date or target_type != meal.meal_type:
+        has_personal_booking = db.query(models.MealPlan.id).filter_by(meal_id=meal_id).first()
+        if has_personal_booking or has_customer_activity(db, meal_id):
+            raise HTTPException(409, "This meal has bookings or customer activity. Keep its date and meal type unchanged.")
     duplicate = db.query(models.Meal).filter(
         models.Meal.date == target_date,
         models.Meal.meal_type == target_type,
@@ -199,6 +214,9 @@ def update_meal(
         validate_image(update_data.get("menu_description", meal.menu_description), update_data["image_url"], current_user.id)
     for field, value in update_data.items():
         setattr(meal, field, value)
+    # Preserve an intentional one-date edit when the weekly template is refreshed.
+    meal.weekly_menu_entry_id = None
+    meal.weekly_menu_override = True
 
     if meal.date != previous_date:
         db.flush()
@@ -232,15 +250,11 @@ def delete_meal(
             detail="Meal not found",
         )
 
-    orders_exist = (
-        db.query(models.MealOrder)
-        .filter(
-            models.MealOrder.meal_id == meal_id
-        )
-        .first()
-    )
+    if meal.weekly_menu_entry_id is not None:
+        raise HTTPException(409, "This meal repeats from the weekly menu. Edit or remove that weekday slot instead.")
 
-    if orders_exist or db.query(models.MealPlan).filter_by(meal_id=meal_id).first():
+    has_personal_booking = db.query(models.MealPlan.id).filter_by(meal_id=meal_id).first()
+    if has_personal_booking or has_customer_activity(db, meal_id):
         raise HTTPException(
             status_code=400,
             detail=(

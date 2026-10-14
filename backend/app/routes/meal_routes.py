@@ -9,13 +9,15 @@ from app import models, schemas
 from app.meal_coverage import covers
 from app.auth import get_current_user
 from app.subscription_extensions import lock_customer, change_extension
+from app.weekly_menu import sync_weekly_menu, weekly_menu_lock
 
 
 router = APIRouter(prefix="/meals", tags=["meals"])
 
 
 def ensure_not_dispatched(db, user_id, meal_id):
-    lock_customer(db, user_id)
+    if not lock_customer(db, user_id):
+        raise HTTPException(404, "Customer not found")
     user = db.get(models.User, user_id)
     if not user or user.role != "customer":
         raise HTTPException(403, "Customer access required")
@@ -46,6 +48,10 @@ def get_todays_meals(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
+    owner_id = db.info.get("mess_owner_id")
+    with weekly_menu_lock(owner_id):
+        sync_weekly_menu(db, owner_id)
+        db.commit()
     meals = (
         db.query(models.Meal)
         .filter(models.Meal.date == date.today())
@@ -72,6 +78,10 @@ def get_upcoming_meals(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
+    owner_id = db.info.get("mess_owner_id")
+    with weekly_menu_lock(owner_id):
+        sync_weekly_menu(db, owner_id)
+        db.commit()
     meals = (
         db.query(models.Meal)
         .filter(models.Meal.date >= date.today())
@@ -148,6 +158,7 @@ def skip_meal(
     order = existing_order or models.MealOrder(user_id=current_user.id, meal_id=meal.id)
     order.status, order.extra_items, order.extra_cost = "skipped", None, 0
     order.extension_plan_id = plan.id
+    order.extension_credit = True
     db.add(order)
     change_extension(db, plan, 1)
     db.commit()
@@ -204,8 +215,29 @@ def undo_skip(
 
     if order.extension_plan_id:
         plan = db.get(models.MealPlan, order.extension_plan_id)
-        change_extension(db, plan, -1)
+        paused_date = db.query(models.MealDatePause.id).filter_by(
+            user_id=current_user.id, plan_id=plan.id, date=meal.date, active=True
+        ).first()
+        if order.extension_credit and not paused_date:
+            change_extension(db, plan, -1)
+        elif order.extension_credit and paused_date:
+            remaining = db.query(models.MealOrder).join(
+                models.Meal, models.MealOrder.meal_id == models.Meal.id
+            ).filter(
+                models.MealOrder.user_id == current_user.id,
+                models.MealOrder.extension_plan_id == plan.id,
+                models.MealOrder.status == "skipped",
+                models.MealOrder.meal_id != meal.id,
+                models.Meal.date == meal.date,
+            ).all()
+            if any(item.extension_credit for item in remaining):
+                change_extension(db, plan, -1)
+            elif remaining:
+                remaining[0].extension_credit = True
+            else:
+                change_extension(db, plan, -1)
         order.extension_plan_id = None
+        order.extension_credit = False
     order.status = "confirmed"
 
     db.commit()

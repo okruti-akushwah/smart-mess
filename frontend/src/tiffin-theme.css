@@ -28,6 +28,7 @@ body, .mess-directory, .mess-public { background: #fcfaf5; }
 .dashboard .welcome .btn-outline:hover, .customer-overview .btn-outline:hover { background: #e2ead8; color: #244c35; }
 .customer-overview details, .customer-overview details p { color: #52684c; }
 .welcome .btn-primary, .customer-overview .btn-primary { color: #244c35; background: #f6d37a; box-shadow: 0 4px 12px #ceae6e20; }
+.welcome .btn-primary:hover:not(:disabled), .customer-overview .btn-primary:hover:not(:disabled) { color: #244c35; background: #edc45f; box-shadow: 0 5px 14px #ceae6e35; }
 .stat-card { background: #edf2df; border-color: #dfe7cc; }
 .stat-card:nth-child(2) { background: #fff2d3; border-color: #efe4c8; }
 .stat-card:nth-child(3) { background: #fbe9df; border-color: #f0dbcd; }

@@ -1,4 +1,5 @@
 import axios from "axios";
+import { loginUrl } from "./authRouting";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "/api",
@@ -16,6 +17,9 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
+    const messToken = localStorage.getItem("activeMessToken");
+    if (messToken && !config.headers["X-Mess-Token"]) config.headers["X-Mess-Token"] = messToken;
+
     return config;
   },
   (error) => Promise.reject(error)
@@ -29,9 +33,16 @@ export function errorMessage(error, fallback = "Something went wrong. Please try
 
 api.interceptors.response.use(response => response, error => {
   if (error.response?.status === 401 && !error.config?.url?.startsWith("/auth/")) {
-    const loginPath = localStorage.getItem("role") === "owner" ? "/owner/login" : "/login";
+    let destination = window.location.pathname + window.location.search + window.location.hash;
+    const selectedMess = localStorage.getItem("activeMessToken");
+    if (localStorage.getItem("role") === "customer" && selectedMess &&
+        window.location.pathname.startsWith("/customer") && window.location.pathname !== "/customer/history") {
+      destination = `/join/${encodeURIComponent(selectedMess)}?next=${encodeURIComponent(destination)}`;
+    }
+    const loginPath = loginUrl(destination);
     localStorage.removeItem("token");
     localStorage.removeItem("role");
+    localStorage.removeItem("activeMessToken");
     window.location.assign(loginPath);
   }
   return Promise.reject(error);
