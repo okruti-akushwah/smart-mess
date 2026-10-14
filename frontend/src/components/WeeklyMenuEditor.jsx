@@ -168,7 +168,7 @@ export default function WeeklyMenuEditor() {
               update("menu_description", combined.join(', '));
             }}>
               <option value={CUSTOM_MENU}>{translate("Select to add to this meal")}</option>
-              {allMenuChoices.map(menu => <option value={menu} key={menu}>{menu}</option>)}
+              {allMenuChoices.map(menu => <option value={menu} key={menu}>{translate(menu)}</option>)}
             </select>
           </label>
         </div>
@@ -180,7 +180,7 @@ export default function WeeklyMenuEditor() {
           <p>{translate("Select all the dishes you serve together. You can also type custom dishes below, separated by commas.")}</p>
           <div className="weekly-dish-options">{dishChoices.map(dish => <label key={dish}>
             <input type="checkbox" checked={selectedDishes.some(item => item.toLocaleLowerCase() === dish.toLocaleLowerCase())}
-              onChange={() => toggleDish(dish)} />{dish}
+              onChange={() => toggleDish(dish)} />{translate(dish)}
           </label>)}</div>
           <div className="weekly-new-dish">
             <label htmlFor="weekly-new-dish">{translate("Add a new dish")}

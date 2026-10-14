@@ -80,7 +80,7 @@ function BillHistory() {
       <Navbar title={translate("Bills")} />
 
       <main className="dashboard">
-        <section className="welcome bills-heading"><div><p className="eyebrow">TRANSPARENT BILLING</p><h1>{translate("Your Bills")}</h1><p>{translate("View your bills, payment confirmations and receipts.")}</p></div><div className="bills-pending-total" role="status" aria-live="polite"><span>{translate("Pending to pay owner")}</span><strong>{amountDue === null ? translate("Unavailable") : `₹${amountDue.toFixed(2)}`}</strong>{amountDue === 0 && <small>{translate("No payment pending")}</small>}</div></section>
+        <section className="welcome bills-heading"><div><p className="eyebrow">{translate("TRANSPARENT BILLING")}</p><h1>{translate("Your Bills")}</h1><p>{translate("View your bills, payment confirmations and receipts.")}</p></div><div className="bills-pending-total" role="status" aria-live="polite"><span>{translate("Pending to pay owner")}</span><strong>{amountDue === null ? translate("Unavailable") : `₹${amountDue.toFixed(2)}`}</strong>{amountDue === 0 && <small>{translate("No payment pending")}</small>}</div></section>
         <BillWorkflow onUpdate={loadBills} payOnCheckout /><PaymentHistory />
 
         {error &&
@@ -105,7 +105,7 @@ function BillHistory() {
 
           </div> :
 
-          <div className="bill-summary"><p>{currentBill.extension_days || 0} extra subscription days · {currentBill.skipped_meals || 0} skipped meals · Subscription ends {currentBill.end_date}</p>
+          <div className="bill-summary"><p>{currentBill.extension_days || 0}{translate(" extra subscription days · ")}{currentBill.skipped_meals || 0}{translate(" skipped meals · Subscription ends ")}{currentBill.end_date}</p>
               <BillStat
               label="Base Plan"
               value={

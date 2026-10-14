@@ -1,3 +1,4 @@
+import { sharedGet } from "./sharedGet";
 import axios from "axios";
 import { loginUrl } from "./authRouting";
 
@@ -47,6 +48,9 @@ api.interceptors.response.use(response => response, error => {
   }
   return Promise.reject(error);
 });
+
+const originalGet = api.get.bind(api);
+api.get = sharedGet(originalGet, () => [api.defaults.baseURL, localStorage.getItem('token'), localStorage.getItem('activeMessToken')]);
 
 export default api;
 

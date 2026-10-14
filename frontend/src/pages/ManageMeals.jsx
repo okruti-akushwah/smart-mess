@@ -1,6 +1,6 @@
 import { useTranslation } from "../i18n/useTranslation";
 import MenuItemPicker from "../components/MenuItemPicker";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MenuImage from "../components/MenuImage";
 import MenuPhotoEditor from "../components/MenuPhotoEditor";
@@ -11,6 +11,7 @@ import WeeklyMenuEditor from "../components/WeeklyMenuEditor";
 function ManageMeals() {
   const translate = useTranslation();
   const navigate = useNavigate();
+  const dateChangesRef = useRef(null);
 
   const [meals, setMeals] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -195,10 +196,10 @@ function ManageMeals() {
       meal.is_complimentary ?? true
     });
 
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth"
-    });
+    if (dateChangesRef.current) {
+      dateChangesRef.current.open = true;
+      dateChangesRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   };
 
   const cancelEdit = () => {
@@ -267,117 +268,7 @@ function ManageMeals() {
 
         <WeeklyMenuEditor />
 
-        <details className="one-time-meal-tools">
-          <summary>{translate("Manage one-time date changes")}</summary>
         <section className="management-card">
-
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">
-                {translate(editingId ?
-                "EDIT MEAL" :
-                "NEW MEAL")}
-              </p>
-
-              <h2>
-                {translate(editingId ?
-                generating ? "Update menu without photo" : "Update Meal" :
-                generating ? "Save menu without photo" : "Create Meal")}
-              </h2>
-            </div>
-          </div>
-
-          <form
-            className="meal-form"
-            onSubmit={handleSubmit}>
-            
-
-            <div className="form-field">
-              <label>{translate("Date")}</label>
-
-              <input
-                type="date"
-                name="date"
-                value={form.date}
-                onChange={handleChange}
-                required />
-              
-            </div>
-
-            <div className="form-field">
-              <label>{translate("Meal Type")}</label>
-
-              <select
-                name="meal_type"
-                value={form.meal_type}
-                onChange={handleChange}
-                required>
-                
-                <option value="breakfast">{translate(" Breakfast ")}
-
-                </option>
-
-                <option value="lunch">{translate(" Lunch ")}
-
-                </option>
-
-                <option value="dinner">{translate(" Dinner ")}
-
-                </option>
-              </select>
-            </div>
-
-            <MenuItemPicker key={editingId ?? `new-${meals.length}`} value={form.menu_description} onChange={(value) => handleChange({ target: { name: 'menu_description', value } })} />
-
-            <div className="form-field">
-              <label>{translate(" Meal Cutoff Time ")}
-
-              </label>
-
-              <input
-                type="time"
-                name="cutoff_time"
-                value={form.cutoff_time}
-                onChange={handleChange} required />
-              <small>Uses the meal date selected above. Skips, guests and single-meal orders close at this time.</small>
-              
-            </div>
-
-            <label className="form-field">Single-meal price (₹)<input type="number" name="single_price" min="0.01" max="10000" step="0.01" value={form.single_price} onChange={handleChange} placeholder="e.g. 120" /><small>Leave blank to disable single-meal ordering. Members without a subscription can buy this meal at this price.</small></label>
-            <MenuPhotoEditor menu={form.menu_description} imageUrl={form.image_url} onImage={acceptImage} onBusy={setGenerating} />
-            <div className="form-actions">
-
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={saving}>
-                
-                {translate(saving ?
-                "Saving..." :
-                editingId ?
-                generating ? "Update menu without photo" : "Update Meal" :
-                generating ? "Save menu without photo" : "Create Meal")}
-              </button>
-
-              {editingId &&
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={cancelEdit}>{translate(" Cancel Edit ")}
-
-
-              </button>
-              }
-
-            </div>
-            <div className="form-wide" aria-live="polite">
-              {error && <div className="alert error" role="alert">{translate(error)}</div>}
-              {message && <div className="alert success" role="status">{translate(message)}</div>}
-            </div>
-          </form>
-        </section>
-
-        <section>
           <div className="section-heading">
             <div>
               <p className="eyebrow">{translate(" SCHEDULE ")}
@@ -456,6 +347,118 @@ function ManageMeals() {
             </div>
           }
         </section>
+
+        <details className="one-time-meal-tools" ref={dateChangesRef}>
+          <summary>{translate("Manage one-time date changes")}</summary>
+        <section className="management-card">
+
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">
+                {translate(editingId ?
+                "EDIT MEAL" :
+                "NEW MEAL")}
+              </p>
+
+              <h2>
+                {translate(editingId ?
+                generating ? "Update menu without photo" : "Update Meal" :
+                generating ? "Save menu without photo" : "Create Meal")}
+              </h2>
+            </div>
+          </div>
+
+          <form
+            className="meal-form"
+            onSubmit={handleSubmit}>
+            
+
+            <div className="form-field">
+              <label>{translate("Date")}</label>
+
+              <input
+                type="date"
+                name="date"
+                value={form.date}
+                onChange={handleChange}
+                required />
+              
+            </div>
+
+            <div className="form-field">
+              <label>{translate("Meal Type")}</label>
+
+              <select
+                name="meal_type"
+                value={form.meal_type}
+                onChange={handleChange}
+                required>
+                
+                <option value="breakfast">{translate(" Breakfast ")}
+
+                </option>
+
+                <option value="lunch">{translate(" Lunch ")}
+
+                </option>
+
+                <option value="dinner">{translate(" Dinner ")}
+
+                </option>
+              </select>
+            </div>
+
+            <MenuItemPicker key={editingId ?? `new-${meals.length}`} value={form.menu_description} onChange={(value) => handleChange({ target: { name: 'menu_description', value } })} />
+
+            <div className="form-field">
+              <label>{translate(" Meal Cutoff Time ")}
+
+              </label>
+
+              <input
+                type="time"
+                name="cutoff_time"
+                value={form.cutoff_time}
+                onChange={handleChange} required />
+              <small>{translate("Uses the meal date selected above. Skips, guests and single-meal orders close at this time.")}</small>
+              
+            </div>
+
+            <label className="form-field">{translate("Single-meal price (₹)")}<input type="number" name="single_price" min="0.01" max="10000" step="0.01" value={form.single_price} onChange={handleChange} placeholder="e.g. 120" /><small>{translate("Leave blank to disable single-meal ordering. Members without a subscription can buy this meal at this price.")}</small></label>
+            <MenuPhotoEditor menu={form.menu_description} imageUrl={form.image_url} onImage={acceptImage} onBusy={setGenerating} />
+            <div className="form-actions">
+
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={saving}>
+                
+                {translate(saving ?
+                "Saving..." :
+                editingId ?
+                generating ? "Update menu without photo" : "Update Meal" :
+                generating ? "Save menu without photo" : "Create Meal")}
+              </button>
+
+              {editingId &&
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={cancelEdit}>{translate(" Cancel Edit ")}
+
+
+              </button>
+              }
+
+            </div>
+            <div className="form-wide" aria-live="polite">
+              {error && <div className="alert error" role="alert">{translate(error)}</div>}
+              {message && <div className="alert success" role="status">{translate(message)}</div>}
+            </div>
+          </form>
+        </section>
+
+
 
         </details>
 

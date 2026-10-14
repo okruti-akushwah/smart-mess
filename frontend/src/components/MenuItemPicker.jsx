@@ -29,7 +29,7 @@ export default function MenuItemPicker({ value, onChange }) {
   return <div className="form-field form-wide menu-item-picker">
     <span className="menu-picker-label">{translate("Choose dishes for this meal")}</span>
     <div className="menu-dish-grid" role="group" aria-label={translate("Meal dishes")}>
-      {choices.map(item => <div className={`menu-dish-row ${isSelected(item) ? 'is-selected' : ''}`} key={item}>
+      {choices.map(item => <div className={`menu-dish-row ${isSelected(item) ? "is-selected" : ''}`} key={item}>
         <span>{translate(item)}</span><div className="menu-dish-controls">
           <button type="button" disabled={!isSelected(item)} aria-label={translate(`Remove ${item} from this meal`)} onClick={() => remove(item)}>−</button>
           <button type="button" disabled={isSelected(item)} aria-label={translate(`Add ${item} to this meal`)} onClick={() => append(item)}>+</button>

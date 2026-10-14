@@ -111,3 +111,6 @@ app.include_router(catalog_routes.router)
 
 from app.routes import purchase_routes
 app.include_router(purchase_routes.router)
+
+from app.routes import translation_routes
+app.include_router(translation_routes.router)

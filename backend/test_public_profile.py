@@ -3,6 +3,26 @@ import test_app
 from app import models
 
 class PublicProfileTests(test_app.ApplicationTests):
+    def test_directory_uses_one_query_regardless_of_owner_count(self):
+        from sqlalchemy import event
+        self.client.get('/owner/join-link', headers=self.owner)
+        for phone in ('9876543291', '9876543292', '9876543293'):
+            headers, _ = self.account(phone, 'owner')
+            self.client.get('/owner/join-link', headers=headers)
+        statements = []
+        def track(connection, cursor, statement, parameters, context, executemany):
+            if statement.lstrip().upper().startswith('SELECT'):
+                statements.append(statement)
+        event.listen(self.engine, 'before_cursor_execute', track)
+        try:
+            response = self.client.get('/public/messes')
+        finally:
+            event.remove(self.engine, 'before_cursor_execute', track)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(len(response.json()), 4)
+        self.assertTrue(all(row['join_token'] for row in response.json()))
+        self.assertEqual(len(statements), 1)
+
     def test_business_details_saved_public_and_isolated(self):
         payload = {'name': 'Test kitchen', 'owner_name': 'Public owner',
             'business_type': 'Home-style tiffin', 'tagline': 'Fresh daily',

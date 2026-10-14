@@ -29,9 +29,13 @@ def invite(db: Session = Depends(get_db), owner=Depends(require_owner)):
 
 
 def find_invite(token, db):
+    cached = db.info.get("public_invite")
+    if cached and cached.token == token:
+        return cached
     item = db.query(models.JoinInvite).filter_by(token=token).first()
     if not item:
         raise HTTPException(404, 'This join link is invalid. Ask your owner for the correct QR.')
+    db.info['public_invite'] = item
     return item
 
 

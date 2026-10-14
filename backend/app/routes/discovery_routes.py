@@ -345,12 +345,12 @@ def review(body: ReviewInput, db: Session = Depends(get_db), user=Depends(custom
 @router.get("/public/reviews")
 def public_reviews(db: Session = Depends(public_db)):
     rows = db.query(models.Feedback, models.User.name, models.Meal.menu_description).join(models.User, models.User.id == models.Feedback.user_id).join(models.Meal, models.Meal.id == models.Feedback.meal_id).order_by(models.Feedback.id.desc()).limit(30).all()
-    return [{"id": f.id, "name": name.split()[0] if name.split() else "Customer", "rating": f.rating, "comment": f.comment, "menu": menu} for f, name, menu in rows]
+    return [{"id": f.id, "meal_id": f.meal_id, "name": name.split()[0] if name.split() else "Customer", "rating": f.rating, "comment": f.comment, "menu": menu} for f, name, menu in rows]
 
 
 @router.get("/owner/reviews")
 def owner_reviews(db: Session = Depends(get_db), owner=Depends(require_owner)):
     rows = db.query(models.Feedback, models.User, models.Meal).join(models.User, models.User.id == models.Feedback.user_id).join(models.Meal, models.Meal.id == models.Feedback.meal_id).order_by(models.Feedback.created_at.desc(), models.Feedback.id.desc()).limit(100).all()
-    return [{"id": f.id, "name": u.name, "rating": f.rating, "comment": f.comment,
+    return [{"id": f.id, "meal_id": f.meal_id, "name": u.name, "rating": f.rating, "comment": f.comment,
         "menu": m.menu_description, "image_url": m.image_url, "date": m.date,
         "meal_type": m.meal_type, "created_at": f.created_at} for f, u, m in rows]

@@ -1,11 +1,9 @@
-import { useTranslation } from "../i18n/useTranslation";
 import { loginUrl } from "../services/authRouting";
 import MembershipGate from "./MembershipGate";
 import CustomerAddressGate from "./CustomerAddressGate";
 import { Navigate, useLocation } from "react-router-dom";
 
 function ProtectedRoute({ children, requiredRole }) {
-  const translate = useTranslation();
   const location = useLocation();
   const token = localStorage.getItem("token");
   const role = localStorage.getItem("role");
@@ -29,7 +27,7 @@ function ProtectedRoute({ children, requiredRole }) {
     return <Navigate to="/customer/messes" state={{ from: location.pathname + location.search + location.hash }} replace />;
   }
 
-  return role === "customer" ? <MembershipGate><CustomerAddressGate>{translate(children)}</CustomerAddressGate></MembershipGate> : children;
+  return role === "customer" ? <MembershipGate><CustomerAddressGate>{children}</CustomerAddressGate></MembershipGate> : children;
 }
 
 export default ProtectedRoute;

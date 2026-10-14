@@ -71,6 +71,7 @@ def output(owner, db):
     profile = db.get(models.MessProfile, owner.id)
     data = {field: getattr(profile, field) or '' if profile else '' for field in ProfileInput.model_fields if field != 'timings'}
     data['name'] = data['name'] or f'{owner.name}’s mess'
+    data['owner_id'] = owner.id
     data['profile_saved'] = profile is not None
     data['timings'] = [{'meal_type': t.meal_type, 'from_time': t.from_time, 'to_time': t.to_time} for t in db.query(models.MealTiming).filter_by(owner_id=owner.id).order_by(models.MealTiming.from_time)]
     data['join_token'] = invite(db, owner)['token']
@@ -120,9 +121,26 @@ def public_profile(token: str, db: Session = Depends(public_db)):
 
 @router.get('/public/messes')
 def mess_directory(db: Session = Depends(get_db)):
-    owners = db.query(models.User).filter_by(role='owner').order_by(models.User.id).all()
-    return [{'name': output(owner, db)['name'], 'name_hi': output(owner, db)['name_hi'], 'join_token': invite(db, owner)['token']}
-            for owner in owners]
+    def rows():
+        return db.query(models.User.id, models.User.name, models.MessProfile.name.label('mess_name'),
+            models.MessProfile.name_hi, models.JoinInvite.token).outerjoin(
+            models.MessProfile, models.MessProfile.owner_id == models.User.id).outerjoin(
+            models.JoinInvite, models.JoinInvite.owner_id == models.User.id).filter(
+            models.User.role == 'owner').order_by(models.User.id).all()
+    owners = rows()
+    missing = [row for row in owners if not row.token]
+    if missing:
+        # Legacy owners may predate invitations. Create these once, as a batch.
+        import secrets
+        from sqlalchemy.exc import IntegrityError
+        db.add_all(models.JoinInvite(owner_id=row.id, token=secrets.token_urlsafe(24)) for row in missing)
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()  # Another request may have created the same invitation.
+        owners = rows()
+    return [{'name': row.mess_name or f'{row.name}’s mess', 'name_hi': row.name_hi or '',
+             'join_token': row.token} for row in owners if row.token]
 
 
 class GuestPriceInput(BaseModel):

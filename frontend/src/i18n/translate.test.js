@@ -32,3 +32,11 @@ test('uses member terminology in Hindi labels',()=>{
  assert.equal(translateText('Member login','hi'),'सदस्य लॉग इन');
  assert.equal(translateText('Upload your own payment QR. Members can scan it. Record the payment after you receive it.','hi'),'अपना भुगतान QR जोड़ें। सदस्य इसे स्कैन कर सकते हैं। पैसे मिलने के बाद भुगतान दर्ज करें।');
 });
+
+test('new UI text, statuses, validation and brands use correct Hindi fallback',()=>{
+ assert.equal(translateText('Order food','hi'),'भोजन ऑर्डर करें');
+ assert.equal(translateText('pending_payment','hi'),'भुगतान लंबित');
+ assert.equal(translateText('phone: String should match pattern abc','hi'),'फ़ोन नंबर: सही प्रारूप में विवरण दर्ज करें');
+ assert.equal(translateText('Smart Mess','hi'),'Smart Mess');
+ assert.equal(translateText('New content not in resources','hi'),'New content not in resources');
+});

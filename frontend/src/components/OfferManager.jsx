@@ -108,7 +108,7 @@ export default function OfferManager() {
           <input required type="number" min="0.01" max="100000" step="0.01" name="price" value={form.price} onChange={change} />
         </label>
         <fieldset className="form-field">
-          <legend>Meals included</legend>
+          <legend>{translate("Meals included")}</legend>
           {["breakfast", "lunch", "dinner"].map((type) => (
             <label key={type} className="plan-meal-option">
               <input
@@ -124,9 +124,9 @@ export default function OfferManager() {
               {translate(type)}
             </label>
           ))}
-          {!form.meal_types.length && <p role="alert">Choose at least one meal.</p>}
+          {!form.meal_types.length && <p role="alert">{translate("Choose at least one meal.")}</p>}
         </fieldset>
-        <p className="muted">Each skipped meal adds one subscription day.</p>
+        <p className="muted">{translate("Each skipped meal adds one subscription day.")}</p>
         <label className="form-field">
           {translate("What's included")}
           <input required minLength={3} maxLength={500} name="description" value={form.description} onChange={change} />
@@ -142,7 +142,7 @@ export default function OfferManager() {
           <div>
             <strong>{offer.name} · ₹{translate(offer.price)}</strong>
             <p>{translate(offer.category)} · {translate(offer.duration_days)}{translate(" days · ")}{offer.description}</p>
-            <p>Includes: {(offer.meal_types || ["breakfast", "lunch", "dinner"]).map(translate).join(" · ")}</p>
+            <p>{translate("Includes: ")}{(offer.meal_types || ["breakfast", "lunch", "dinner"]).map(translate).join(" · ")}</p>
           </div>
           <div>
             <button

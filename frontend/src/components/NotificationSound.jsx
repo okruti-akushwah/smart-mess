@@ -1,3 +1,4 @@
+import { useTranslation } from "../i18n/useTranslation";
 import { useEffect, useState } from "react";
 import api from "../services/api";
 
@@ -26,6 +27,8 @@ function chime() {
 }
 
 export default function NotificationSound({ role }) {
+  const translate = useTranslation();
+
   const [on, setOn] = useState(enabled);
   const [error, setError] = useState("");
   useEffect(() => {
@@ -80,5 +83,5 @@ export default function NotificationSound({ role }) {
       chime();
     } catch { setError('Notification sound is unavailable in this browser.'); }
   }
-  return <div><button className="btn btn-outline" type="button" onClick={toggle} aria-pressed={on} aria-label={on ? 'Mute notification sound' : 'Enable notification sound'} title={on ? 'Notification sound on — click to mute' : 'Enable notification sound'} style={{ padding: '10px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" /><path d="M10 21h4" />{!on && <path d="M3 3l18 18" />}</svg></button>{error && <small role="status">{error}</small>}</div>;
+  return <div><button className="btn btn-outline" type="button" onClick={toggle} aria-pressed={on} aria-label={on ? translate("Mute notification sound") : translate("Enable notification sound")} title={on ? translate("Notification sound on — click to mute") : translate("Enable notification sound")} style={{ padding: '10px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" /><path d="M10 21h4" />{!on && <path d="M3 3l18 18" />}</svg></button>{error && <small role="status">{translate(error)}</small>}</div>;
 }

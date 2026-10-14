@@ -171,3 +171,14 @@ Meal history contains orders, subscriptions, payment submissions and confirmed r
 The dashboard asks customers to rate their latest eligible meal the day after delivery is marked Delivered. It shows the meal photo/menu, five stars and an optional suggestion. Reviews sends feedback to the owner's dashboard panel, Meal ratings & suggestions. These are in-app updates; ratings are also included in existing public reviews. Skipped, unpaid and undelivered new checkout meals are excluded. Legacy owner-assigned subscriptions without delivery tracking retain their past-meal review behaviour.
 
 The database migration adds nullable fields without replacing existing subscriptions, meals or payments. Backend regression tests cover checkout activation, single-meal counts, payment history, reviews, isolation and migration preservation.
+
+
+## English and Hindi
+
+The selector uses i18next/react-i18next and persists `mess-language` in the browser. Existing Hindi resources are retained, with sentence translations for customer and owner screens. `npm run check:translations` checks static rendered text and translation calls; `npm run test:language` and `npm run test:language-ui` verify language behavior. New static UI sentences still require a reviewed Hindi resource; runtime machine translation is reserved for saved descriptive content.
+
+Dynamic saved menus, offer descriptions and public mess descriptions use the backend `/translations` endpoint. It accepts record identifiers and an allowlist of public fields, not arbitrary form text. English source values, names, addresses, IDs and amounts are not rewritten. Owner-provided Hindi descriptions take precedence. English is shown when credentials are missing, the provider is unavailable, or a protected value cannot be restored safely.
+
+Set `GOOGLE_TRANSLATE_API_KEY` privately on the backend for Google Cloud Translation Basic (v2), enable that API and its billing, and restrict the key to the translation API. Never use a VITE-prefixed credential. Restart the backend after configuration. The default application limit is 50,000 requested source characters per UTC day per worker; configure `TRANSLATION_DAILY_CHARACTER_LIMIT` and provider-side project quotas for your budget. No live provider calls are made by tests.
+
+Translations are batched and cached by content hash, language and protected names. Memory cache entries last 30 days with bounded size. For persistence across restarts and sharing between workers, configure `TRANSLATION_REDIS_REST_URL` and `TRANSLATION_REDIS_REST_TOKEN` for a separate Redis REST cache (such as Upstash). Cache storage does not modify the business database. No database migration is needed. The frontend restores original English immediately when the language changes; late Hindi responses do not overwrite English or form inputs.
