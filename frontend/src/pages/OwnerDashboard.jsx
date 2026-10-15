@@ -1,6 +1,5 @@
 import DynamicText from "../components/DynamicText";
 import PersonalOrders from "../components/PersonalOrders";
-import OwnerMealFeedback from "../components/OwnerMealFeedback";
 import { useTranslation } from "../i18n/useTranslation";
 import PendingRequestsSummary from "../components/PendingRequestsSummary";
 import { useCallback, useEffect, useState } from "react";
@@ -22,6 +21,7 @@ function OwnerDashboard() {
   const [error, setError] = useState("");
   const [now, setNow] = useState(() => Date.now());
   const [dayFilter, setDayFilter] = useState('all');
+
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -94,9 +94,11 @@ function OwnerDashboard() {
 
             </p>
 
-            <h1>{translate("Good food. Great flow.")}
+            <h1 style={{ overflowWrap: 'anywhere' }}>{translate("Welcome")}{publicProfile?.owner_name?.trim() ? `, ${publicProfile.owner_name.trim()}` : ''}!
 
             </h1>
+
+            {publicProfile?.name?.trim() && <h2 style={{ margin: '8px 0 12px', fontSize: 'clamp(20px, 2.5vw, 28px)', overflowWrap: 'anywhere' }}>{publicProfile.name.trim()}</h2>}
 
             <p>{translate("Meals, guests and orders. One clear view.")}
 
@@ -224,7 +226,6 @@ function OwnerDashboard() {
         }
         <PersonalOrders onUpdate={loadDashboard} />
         <section className="management-card"><h2>{translate("Latest completed meal statistics")}</h2>{latestMeals.length ? latestMeals.map(meal => <div className="request-row" key={meal.meal_id}><div><strong>{meal.date} · {translate(meal.meal_type)}</strong><p><DynamicText kind="meal" id={meal.id} field="menu_description" source={meal.menu_description} /></p><p>{meal.expected_headcount}{translate(" meals · ")}{meal.skipped_subscribers}{translate(" skips · ")}{meal.guests}{translate(" guests · ")}{meal.personal_orders}{translate(" personal orders")}</p></div></div>) : <p>{translate("No completed meals yet.")}</p>}</section>
-        <OwnerMealFeedback />
       </main>
     </>);
 

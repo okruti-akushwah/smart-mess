@@ -80,7 +80,9 @@ def output(owner, db):
 
 @router.get('/owner/mess-profile')
 def owner_profile(db: Session = Depends(get_db), owner=Depends(require_owner)):
-    return output(owner, db)
+    data = output(owner, db)
+    data['owner_name'] = data['owner_name'] or owner.name
+    return data
 
 
 @router.put('/owner/mess-profile')
@@ -123,7 +125,9 @@ def public_profile(token: str, db: Session = Depends(public_db)):
 def mess_directory(db: Session = Depends(get_db)):
     def rows():
         return db.query(models.User.id, models.User.name, models.MessProfile.name.label('mess_name'),
-            models.MessProfile.name_hi, models.JoinInvite.token).outerjoin(
+            models.MessProfile.name_hi, models.MessProfile.city, models.MessProfile.area,
+            models.MessProfile.food_type, models.MessProfile.service_type,
+            models.JoinInvite.token).outerjoin(
             models.MessProfile, models.MessProfile.owner_id == models.User.id).outerjoin(
             models.JoinInvite, models.JoinInvite.owner_id == models.User.id).filter(
             models.User.role == 'owner').order_by(models.User.id).all()
@@ -140,7 +144,9 @@ def mess_directory(db: Session = Depends(get_db)):
             db.rollback()  # Another request may have created the same invitation.
         owners = rows()
     return [{'name': row.mess_name or f'{row.name}’s mess', 'name_hi': row.name_hi or '',
-             'join_token': row.token} for row in owners if row.token]
+             'join_token': row.token, 'city': row.city or '', 'area': row.area or '',
+             'food_type': row.food_type or '', 'service_type': row.service_type or ''}
+            for row in owners if row.token]
 
 
 class GuestPriceInput(BaseModel):

@@ -1,8 +1,10 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocation } from 'react-router-dom';
 import { LanguageContext } from './LanguageContext';
 import './i18n';
 export default function LanguageProvider({children}) {
+  const {pathname} = useLocation();
   const {i18n} = useTranslation();
   const language = i18n.resolvedLanguage === 'hi' ? 'hi' : 'en';
   const setLanguage = value => i18n.changeLanguage(value === 'hi' ? 'hi' : 'en');
@@ -11,7 +13,7 @@ export default function LanguageProvider({children}) {
     document.documentElement.lang=language;
   },[language]);
   return <LanguageContext.Provider value={{language,setLanguage}}>
-    <div className="language-toolbar"><label htmlFor="site-language">भाषा / Language</label><select id="site-language" value={language} onChange={event=>setLanguage(event.target.value)}><option value="en">English</option><option value="hi">हिन्दी</option></select></div>
+    {pathname !== '/' && <div className="language-toolbar"><label htmlFor="site-language">भाषा / Language</label><select id="site-language" value={language} onChange={event=>setLanguage(event.target.value)}><option value="en">English</option><option value="hi">हिन्दी</option></select></div>}
     {children}
   </LanguageContext.Provider>;
 }

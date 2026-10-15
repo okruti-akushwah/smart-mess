@@ -3,13 +3,16 @@ from app import models, auth
 from app.installation import initialize
 
 class OwnerSetupTests(ApplicationTests):
-    def test_existing_installation_allows_second_owner_but_requires_customer_join_link(self):
+    def test_existing_installation_allows_owner_and_common_customer_registration(self):
         status = self.client.get('/auth/registration-status')
         self.assertTrue(status.json()['setup_available'])
         self.assertTrue(status.json()['join_token'])
-        for role, code in [('owner', 200), ('customer', 403)]:
-            response = self.client.post('/auth/signup', json={'name': 'Other', 'phone': '9999999999', 'password': 'test1234', 'role': role, 'mess_name': 'Other Mess'})
-            self.assertEqual(response.status_code, code, response.text)
+        for role, phone in [('owner', '9999999999'), ('customer', '9999999997')]:
+            response = self.client.post('/auth/signup', json={'name': 'Other', 'phone': phone, 'password': 'test1234', 'role': role, 'mess_name': 'Other Mess'})
+            self.assertEqual(response.status_code, 200, response.text)
+        with self.Session() as db:
+            customer = db.query(models.User).filter_by(phone='9999999997').one()
+            self.assertIsNone(customer.mess_owner_id)
         self.assertEqual(self.client.get('/owner/meals', headers=self.owner).status_code, 200)
 
     def test_first_owner_setup_is_atomic_and_saves_mess_name(self):

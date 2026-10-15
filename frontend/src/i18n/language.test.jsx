@@ -17,11 +17,15 @@ import WeeklyMenuEditor from '../components/WeeklyMenuEditor';
 import {translateSaved} from '../services/dynamicTranslations';
 vi.mock('../services/api',()=>({default:{get:vi.fn(async url=>({data:url==='/auth/signup/settings'?{demo_registration:true}:url==='/customer/account'?{mess_name:'Sharma Tiffin Centre',customer_name:'Customer',paused_dates:[]}:url==='/customer/activity'?{purchases:[]}:url==='/dashboard/headcount'?{preparation:[],latest_meals:[]}:[]}))},errorMessage:()=> 'Unable to load'}));
 vi.mock('../services/dynamicTranslations',()=>({translateSaved:vi.fn()}));
-function mount(children){return render(<MemoryRouter><LanguageProvider>{children}</LanguageProvider></MemoryRouter>);}
+function mount(children, route='/login'){return render(<MemoryRouter initialEntries={[route]}><LanguageProvider>{children}</LanguageProvider></MemoryRouter>);}
 async function hindi(){fireEvent.change(screen.getByLabelText('भाषा / Language'),{target:{value:'hi'}});await waitFor(()=>expect(i18n.resolvedLanguage).toBe('hi'));}
 beforeEach(async()=>{localStorage.clear();vi.clearAllMocks();await i18n.changeLanguage('en');});
 afterEach(cleanup);
 describe('live English/Hindi switching',()=>{
+ it('hides the language selector on the public home page',()=>{
+  mount(<MessDirectory/>, '/#find-mess');
+  expect(screen.queryByLabelText('भाषा / Language')).toBeNull();
+ });
  it('keeps the owner menu source unchanged while switching',async()=>{
   mount(<WeeklyMenuEditor/>);
   const input=await screen.findByPlaceholderText('For example: Dal, rice, seasonal sabzi and roti');

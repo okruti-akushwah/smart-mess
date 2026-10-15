@@ -34,6 +34,9 @@ import BillHistory
 import OwnerDashboard
   from "./pages/OwnerDashboard";
 import OwnerOnboarding from "./pages/OwnerOnboarding";
+import OwnerReviews from "./pages/OwnerReviews";
+import KitchenAdvisor from "./pages/KitchenAdvisor";
+import ChatWidget from "./components/ChatWidget";
 
 import ManageMeals
   from "./pages/ManageMeals";
@@ -46,6 +49,11 @@ function App() {
   return (
     <BrowserRouter>
       <LanguageProvider><Routes><Route path="/join/:token" element={<JoinMess />} /><Route path="/mess/:token" element={<MessPublic />} />
+        <Route path="/owner/reviews" element={<ProtectedRoute requiredRole="owner"><OwnerReviews /></ProtectedRoute>} />
+        <Route path="/owner/messages" element={<Navigate to="/owner" replace />} />
+        <Route path="/customer/messages" element={<Navigate to="/customer" replace />} />
+        <Route path="/owner/kitchen-advisor" element={<ProtectedRoute requiredRole="owner"><KitchenAdvisor /></ProtectedRoute>} />
+        <Route path="/owner/smarter-meals" element={<Navigate to="/owner/kitchen-advisor" replace />} />
         <Route path="/customer/address" element={<ProtectedRoute requiredRole="customer"><CustomerAddress /></ProtectedRoute>} />
         <Route path="/customer/choose" element={<ProtectedRoute requiredRole="customer"><ChooseFood /></ProtectedRoute>} />
         <Route path="/customer/checkout" element={<ProtectedRoute requiredRole="customer"><CustomerCheckout /></ProtectedRoute>} />
@@ -149,7 +157,7 @@ function App() {
           }
         />
 
-      </Routes></LanguageProvider>
+      </Routes><ChatWidget /></LanguageProvider>
     </BrowserRouter>
   );
 }

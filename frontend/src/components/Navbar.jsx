@@ -6,7 +6,7 @@ import NotificationSound from "./NotificationSound";
 import Icon from "./Icon";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 
-const navIcon = label => ({ Dashboard: 'home', Members: 'people', 'My messes': 'people', Requests: 'people', Meals: 'meal', 'Order food': 'meal', 'Plans & subscriptions': 'calendar', Subscriptions: 'calendar', 'Pause meals': 'pause', Bills: 'bill', Payments: 'bill', 'Meal history': 'calendar', Reviews: 'star', Settings: 'settings', 'Public page': 'home' }[label] || 'home');
+const navIcon = label => ({ Dashboard: 'home', 'AI Advisor': 'wand', Members: 'people', 'My messes': 'people', Requests: 'people', Meals: 'meal', 'Order food': 'meal', 'Plans & subscriptions': 'calendar', Subscriptions: 'calendar', 'Pause meals': 'pause', Bills: 'bill', Payments: 'bill', 'Meal history': 'calendar', Reviews: 'star', Settings: 'settings', 'Public page': 'home' }[label] || 'home');
 
 function Navbar({ title = "Dashboard" }) {
   const translate = useTranslation();
@@ -51,11 +51,11 @@ function Navbar({ title = "Dashboard" }) {
 
       <nav className="nav-links" aria-label={translate("Main navigation")}>
         {role === "owner" ? [
-          ["/owner", "Dashboard"], ["/owner/public-page", "Public page"],
+          ["/owner", "Dashboard"],
           ["/owner/requests", "Requests"], ["/owner/customers", "Members"], ["/owner/meals", "Meals"],
           ["/owner/plans", "Plans & subscriptions"], ["/owner/payments", "Payments"],
-          ["/owner/bills", "Bills"], ["/owner/settings", "Settings"],
-        ].map(([path, label]) => <Link key={path} to={path} aria-current={location.pathname === path ? "page" : undefined}><Icon name={navIcon(label)} size={17} /><span>{translate(label)}</span></Link>) : [
+          ["/owner/bills", "Bills"], ["/owner/reviews", "Reviews"], ["/owner/kitchen-advisor", "AI Advisor"], ["/owner/settings", "Settings"],
+        ].map(([path, label]) => <Link key={path} to={path} aria-current={`${location.pathname}${location.hash}` === path ? "page" : undefined}><Icon name={navIcon(label)} size={17} /><span>{translate(label)}</span></Link>) : [
           ["/customer/messes", "My messes"], ["/customer", "Dashboard"],
           ["/customer/choose?type=meal", "Order food"],
           ["/customer/plans", "Subscriptions"],

@@ -291,7 +291,7 @@ function ManageMeals() {
 
           </div> :
           meals.length === 0 ?
-          <div className="empty-card">{translate(" No upcoming meals yet. Create your first meal above. ")}
+          <div className="empty-card">{translate(" No upcoming meals yet. Set your weekly menu above or add a one-time meal below. ")}
 
 
           </div> :

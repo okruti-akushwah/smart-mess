@@ -4,6 +4,12 @@
 @media(max-width:560px){.mess-menu-weekly .section-heading{padding:24px 20px}.mess-menu-weekly .section-heading:after{right:12px;font-size:62px}.weekly-menu-note{align-items:flex-start;flex-direction:column;gap:5px}}
 
 .mess-business-details { margin: 1.5rem 0; }
+.mess-public .mess-meal { display: flex; flex-direction: column; min-width: 0; }
+.mess-public .mess-meal-photo { display: block; flex-shrink: 0; }
+.mess-public .mess-meal > div { display: flex; flex: 1; flex-direction: column; align-items: flex-start; }
+.mess-public .mess-meal p { margin: auto 0 0; padding-top: 8px; line-height: 1.5; }
+.mess-public .mess-meal .btn { width: 100%; min-height: 44px; margin-top: 16px; padding: 11px 16px; border-radius: 12px; font-size: 14px; line-height: 1.5; text-align: center; white-space: normal; text-decoration: none; }
+.mess-public .mess-meal .btn:focus-visible { outline: 3px solid #347347; outline-offset: 3px; }
 .mess-business-details > div { display: grid; grid-template-columns: minmax(140px, 1fr) 2fr; gap: 1rem; padding: .9rem 0; border-bottom: 1px solid #e1e6db; }
 .mess-business-details dt { font-weight: 600; }
 .mess-business-details dd { margin: 0; overflow-wrap: anywhere; }

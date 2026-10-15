@@ -13,6 +13,8 @@ export default function CustomerMesses() {
   const navigate = useNavigate();
   const location = useLocation();
   const destination = returnTo(location, "/customer");
+  const selectedDestination = destination === "/" || destination === "/customer/messes"
+    ? "/customer" : destination;
   const role = localStorage.getItem("role");
   const token = localStorage.getItem("token");
   const [messes, setMesses] = useState([]);
@@ -47,7 +49,7 @@ export default function CustomerMesses() {
           : item));
         if (data.status === "approved") {
           localStorage.setItem("activeMessToken", mess.join_token);
-          navigate(destination === "/customer/messes" ? "/customer" : destination, {replace: true});
+          navigate(selectedDestination, {replace: true});
         }
       } catch (err) {
         setError(errorMessage(err, "Unable to check this mess request."));
@@ -57,7 +59,7 @@ export default function CustomerMesses() {
       return;
     }
     localStorage.setItem("activeMessToken", mess.join_token);
-    navigate(destination === "/customer/messes" ? "/customer" : destination, {replace: true});
+    navigate(selectedDestination, {replace: true});
   };
 
   return <><Navbar title={translate("My messes")} /><main className="dashboard customer-messes-page">

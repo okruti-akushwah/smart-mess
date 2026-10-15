@@ -35,6 +35,10 @@ class PublicProfileTests(test_app.ApplicationTests):
         public = self.client.get('/public/mess/' + saved.json()['join_token']).json()
         for field, value in payload.items():
             self.assertEqual(public[field], value)
+        listing = next(row for row in self.client.get('/public/messes').json()
+                       if row['join_token'] == saved.json()['join_token'])
+        for field in ('city', 'area', 'food_type', 'service_type'):
+            self.assertEqual(listing[field], payload[field])
         other, _ = self.account('9876543290', 'owner')
         other_profile = self.client.get('/owner/mess-profile', headers=other).json()
         self.assertEqual(other_profile['fssai_number'], '')

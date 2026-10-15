@@ -1,9 +1,12 @@
 import { useTranslation } from "../i18n/useTranslation";
 import { useEffect, useState } from "react";
 import api from "../services/api";
+import { headcountSnapshot, headcountIncreased } from "../services/headcountSound";
+import { incomingMessageCursor, hasIncomingMessage } from "../services/chatSound";
 
 let audioContext;
 let enabled = false;
+const chatCursors = new Map();
 
 function accountKey() {
   try {
@@ -31,6 +34,56 @@ export default function NotificationSound({ role }) {
 
   const [on, setOn] = useState(enabled);
   const [error, setError] = useState("");
+  const messToken = localStorage.getItem('activeMessToken');
+  const chatAccount = accountKey();
+  useEffect(() => {
+    if (!['owner', 'customer'].includes(role) || !chatAccount || (role === 'customer' && !messToken)) return;
+    const key = `${chatAccount}:${messToken || 'owner'}`;
+    let active = true, fetching = false;
+    async function checkMessages() {
+      if (fetching) return;
+      fetching = true;
+      try {
+        const { data } = await api.get('/chat/conversations');
+        if (!active) return;
+        const current = incomingMessageCursor(data);
+        if (hasIncomingMessage(chatCursors.get(key), current)) chime();
+        chatCursors.set(key, Math.max(current, chatCursors.get(key) || 0));
+      } catch { /* Chat popup reports connection errors. Keep the last successful cursor. */ }
+      finally { fetching = false; }
+    }
+    checkMessages();
+    const timer = setInterval(checkMessages, 5000);
+    window.addEventListener('focus', checkMessages);
+    window.addEventListener('chat-updated', checkMessages);
+    return () => { active = false; clearInterval(timer); window.removeEventListener('focus', checkMessages); window.removeEventListener('chat-updated', checkMessages); };
+  }, [role, messToken, chatAccount]);
+  useEffect(() => {
+    if (role !== 'owner') return;
+    let active = true, loading = false, previous = null;
+    async function checkHeadcount() {
+      if (loading) return;
+      loading = true;
+      try {
+        const { data } = await api.get('/dashboard/headcount');
+        if (!active) return;
+        const current = headcountSnapshot(data.preparation || []);
+        if (headcountIncreased(previous, current)) chime();
+        previous = current;
+      } catch { /* Preserve the last successful counts during connection errors. */ }
+      finally { loading = false; }
+    }
+    checkHeadcount();
+    const timer = setInterval(checkHeadcount, 5000);
+    window.addEventListener('focus', checkHeadcount);
+    window.addEventListener('subscription-updated', checkHeadcount);
+    return () => {
+      active = false;
+      clearInterval(timer);
+      window.removeEventListener('focus', checkHeadcount);
+      window.removeEventListener('subscription-updated', checkHeadcount);
+    };
+  }, [role]);
   useEffect(() => {
     if (!['owner', 'customer'].includes(role)) return;
     let active = true, loading = false;

@@ -1,0 +1,17 @@
+/* Light overlays keep page headings readable over the illustrations. */
+.dashboard .welcome, .owner-dashboard .welcome.owner-welcome {
+  --owner-hero-overlay: linear-gradient(90deg, rgba(255,252,244,.98) 0%, rgba(255,252,244,.95) 40%, rgba(255,252,244,.58) 65%, rgba(255,252,244,.12) 100%);
+}
+.owner-workspace-customers .welcome.owner-welcome { background-image: var(--owner-hero-overlay), url('/src/assets/owner-members-hero.png'); }
+.owner-workspace-requests .welcome.owner-welcome { background-image: var(--owner-hero-overlay), url('/src/assets/owner-requests-hero.png'); }
+.owner-workspace-plans .welcome.owner-welcome { background-image: var(--owner-hero-overlay), url('/src/assets/owner-plans-hero.png'); }
+.owner-workspace-bills .welcome.owner-welcome { background-image: var(--owner-hero-overlay), url('/src/assets/owner-bills-hero.png'); }
+.owner-workspace-settings .welcome.owner-welcome { background-image: var(--owner-hero-overlay), url('/src/assets/owner-settings-hero.png'); }
+.owner-payments-page .welcome.owner-welcome { background-image: var(--owner-hero-overlay), url('/src/assets/owner-payments-hero.png'); }
+.owner-reviews-page .welcome.owner-welcome { background-image: var(--owner-hero-overlay), url('/src/assets/owner-reviews-hero.png'); }
+
+@media (max-width: 640px) {
+  .dashboard .welcome, .owner-dashboard .welcome.owner-welcome {
+    --owner-hero-overlay: linear-gradient(90deg, rgba(255,252,244,.97), rgba(255,252,244,.84) 60%, rgba(255,252,244,.55));
+  }
+}

@@ -8,7 +8,7 @@ from pathlib import Path
 from sqlalchemy import Column, DateTime, MetaData, String, Table, inspect, select, text
 
 
-REVISIONS = ("0001_baseline", "0002_concurrency_invariants", "0003_pause_date_credits", "0004_weekly_menu", "0005_multi_mess_memberships", "0006_business_details")
+REVISIONS = ("0001_baseline", "0002_concurrency_invariants", "0003_pause_date_credits", "0004_weekly_menu", "0005_multi_mess_memberships", "0006_business_details", "0007_in_app_chat")
 VERSION_TABLE = Table("app_schema_revisions", MetaData(),
                       Column("revision", String(64), primary_key=True),
                       Column("applied_at", DateTime, nullable=False))
@@ -154,6 +154,11 @@ def business_details(connection):
     add_business_details(connection)
 
 
+def in_app_chat(connection):
+    from app.models import ChatMessage
+    ChatMessage.__table__.create(connection, checkfirst=True)
+
+
 OPERATIONS = {
     "0001_baseline": baseline,
     "0002_concurrency_invariants": concurrency_invariants,
@@ -161,6 +166,7 @@ OPERATIONS = {
     "0004_weekly_menu": weekly_menu,
     "0005_multi_mess_memberships": multi_mess_memberships,
     "0006_business_details": business_details,
+    "0007_in_app_chat": in_app_chat,
 }
 
 
@@ -186,7 +192,9 @@ def upgrade(engine, allow_legacy_upgrade=False):
         for revision in report["pending"]:
             OPERATIONS[revision](connection)
             migrated = schema_status(connection)
-            if migrated["missing"] or (revision == "0002_concurrency_invariants" and migrated["missing_indexes"]):
+            missing_now = {table: columns for table, columns in migrated['missing'].items()
+                           if table != 'chat_messages' or revision == '0007_in_app_chat'}
+            if missing_now or (revision == "0002_concurrency_invariants" and migrated["missing_indexes"]):
                 raise RuntimeError("Migration did not produce the expected schema")
             connection.execute(VERSION_TABLE.insert().values(
                 revision=revision, applied_at=datetime.now(timezone.utc).replace(tzinfo=None)))

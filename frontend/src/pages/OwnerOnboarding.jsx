@@ -4,7 +4,6 @@ import Navbar from "../components/Navbar";
 import MessProfileEditor from "../components/MessProfileEditor";
 import WeeklyMenuEditor from "../components/WeeklyMenuEditor";
 import OfferManager from "../components/OfferManager";
-import PaymentOptions from "../components/PaymentOptions";
 import api, { errorMessage } from "../services/api";
 import { useTranslation } from "../i18n/useTranslation";
 import "./owner-onboarding.css";
@@ -13,7 +12,7 @@ const steps = [
   { title: "What should members know about your mess?", hint: "Add the address, contact details and meal timings people need before joining.", label: "Your mess" },
   { title: "What will you serve each week?", hint: "Set a repeating menu once. Upcoming dated meals are created from it automatically, and you can edit it whenever needed.", label: "Weekly menu" },
   { title: "Which plans can members choose?", hint: "Publish the meal plans and prices you want to offer. You can update them later.", label: "Plans & prices" },
-  { title: "How should members pay you?", hint: "Upload your payment QR and add the recipient details members should verify before paying.", label: "Payment QR" },
+  { title: "How should members pay you?", hint: "Manage your payment QR and recipient details in Payments.", label: "Payment QR" },
   { title: "Ready to invite your first members?", hint: "Share your public mess link. Members can view your details and send a request to join.", label: "Invite members" },
 ];
 
@@ -84,7 +83,7 @@ export default function OwnerOnboarding() {
           <div hidden={current !== 0}><MessProfileEditor /></div>
           <div hidden={current !== 1}><WeeklyMenuEditor /></div>
           <div hidden={current !== 2}><OfferManager /></div>
-          <div hidden={current !== 3}><PaymentOptions owner /></div>
+          <div hidden={current !== 3}><section className="management-card"><p>{translate("Manage your payment QR and recipient details in Payments.")}</p><Link className="btn btn-primary" to="/owner/payments">{translate("Payments")}</Link></section></div>
           <div hidden={current !== 4}><section className="management-card owner-onboarding-invite">
             <h3>{translate("Your public mess link")}</h3>
             <p>{translate("Share this link with people who want to see your mess and request to join.")}</p>

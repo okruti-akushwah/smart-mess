@@ -1,5 +1,5 @@
 from decimal import Decimal
-from datetime import date
+from datetime import date, datetime
 from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel, Field
@@ -160,8 +160,27 @@ def owner_payment_summary(db: Session = Depends(get_db), owner=Depends(require_o
     total, count = db.query(
         func.coalesce(func.sum(models.PaymentRecord.amount), 0),
         func.count(models.PaymentRecord.id),
-    ).one()
-    return {"total_received": float(total or 0), "payment_count": count or 0}
+    ).filter(models.PaymentRecord.owner_id == owner.id).one()
+    start, end, month = payment_month_bounds()
+    monthly_total, monthly_count = db.query(
+        func.coalesce(func.sum(models.PaymentRecord.amount), 0),
+        func.count(models.PaymentRecord.id),
+    ).filter(models.PaymentRecord.owner_id == owner.id,
+             models.PaymentRecord.created_at >= start,
+             models.PaymentRecord.created_at < end).one()
+    return {"total_received": float(total or 0), "payment_count": count or 0,
+            "month_received": float(monthly_total or 0), "month_payment_count": monthly_count or 0,
+            "month": month}
+
+
+def payment_month_bounds(now=None):
+    """India calendar month, represented as naive UTC to match receipt storage."""
+    india = timezone(timedelta(hours=5, minutes=30))
+    current = (now or datetime.now(timezone.utc)).astimezone(india)
+    start = current.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    end = start.replace(year=start.year+1, month=1) if start.month == 12 else start.replace(month=start.month+1)
+    return (start.astimezone(timezone.utc).replace(tzinfo=None),
+            end.astimezone(timezone.utc).replace(tzinfo=None), start.strftime('%Y-%m'))
 
 
 class PaymentInput(BaseModel):

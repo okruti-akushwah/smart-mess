@@ -340,3 +340,19 @@ class MealDatePause(Base):
     date = Column(Date, nullable=False, index=True)
     active = Column(Boolean, nullable=False, default=True, server_default="true")
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class ChatMessage(Base):
+    __tablename__ = 'chat_messages'
+    __table_args__ = (
+        UniqueConstraint('owner_id', 'customer_id', 'from_owner', 'client_key', name='uq_chat_message_retry'),
+        Index('ix_chat_conversation', 'owner_id', 'customer_id', 'id'),
+    )
+    id = Column(Integer, primary_key=True)
+    owner_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    customer_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    from_owner = Column(Boolean, nullable=False)
+    body = Column(String(2000), nullable=False)
+    client_key = Column(String(36), nullable=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    read_at = Column(DateTime, nullable=True)
