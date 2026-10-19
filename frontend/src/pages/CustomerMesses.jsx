@@ -1,3 +1,5 @@
+import Icon from "../components/Icon";
+import CustomerPage from "../components/CustomerPage";
 import { useEffect, useState } from "react";
 import { Link, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { returnTo, loginUrl } from "../services/authRouting";
@@ -62,8 +64,8 @@ export default function CustomerMesses() {
     navigate(selectedDestination, {replace: true});
   };
 
-  return <><Navbar title={translate("My messes")} /><main className="dashboard customer-messes-page">
-    <section className="customer-messes-heading"><div><p className="eyebrow">{translate("YOUR SMART MESS ACCOUNT")}</p><h1>{translate("Choose your mess")}</h1><p>{translate("Use one member account to manage your access to different messes. Each mess reviews its own join request and subscription.")}</p></div><Link className="btn btn-outline" to="/">{translate("Find a mess")}</Link></section>
+  return <><Navbar title={translate("My messes")} /><CustomerPage className="customer-messes-page">
+    <section className="customer-messes-heading"><div><p className="eyebrow">{translate("Your Smart Mess account")}</p><h1>{translate("Choose your mess")}</h1><p>{translate("Use one member account to manage your access to different messes. Each mess reviews its own join request and subscription.")}</p></div><Link className="btn btn-outline" to="/">{translate("Find a mess")}</Link></section>
     {error && <p className="alert error" role="alert">{translate(error)}</p>}
     {loading ? <p className="loading-card" role="status">{translate("Loading your messes…")}</p> : messes.length ? <section className="customer-messes-grid" aria-label={translate("Your mess memberships")}>
       {messes.map(mess => <article className="customer-mess-card" key={mess.owner_id}>
@@ -74,7 +76,8 @@ export default function CustomerMesses() {
           {mess.status === "rejected" && <p>{translate("Contact the mess owner or use their join link to submit your request again.")}</p>}
         </div>
         <button type="button" className="btn btn-primary" onClick={() => selectMess(mess)} disabled={!mess.join_token || checkingOwner !== null}>{translate(checkingOwner === mess.owner_id ? "Checking…" : mess.status === "approved" ? "Open mess" : "Check request")}</button>
+        {mess.join_token && mess.status !== 'approved' && <div className="form-actions"><Link to={`/join/${mess.join_token}?next=${encodeURIComponent(selectedDestination)}`}>{translate('Review join request')}</Link><Link to={`/mess/${mess.join_token}#visit`}>{translate('Mess details & contact')}</Link></div>}
       </article>)}
-    </section> : !error && <section className="customer-messes-empty"><span aria-hidden="true">🍽</span><h2>{translate("No messes joined yet")}</h2><p>{translate("Explore the directory, choose a mess and send a join request. You can use this same account when you join more messes.")}</p><Link className="btn btn-primary" to="/">{translate("Explore messes")}</Link></section>}
-  </main></>;
+    </section> : !error && <section className="customer-messes-empty"><Icon name="meal" size={32} /><h2>{translate("No messes joined yet")}</h2><p>{translate("Explore the directory, choose a mess and send a join request. You can use this same account when you join more messes.")}</p><Link className="btn btn-primary" to="/">{translate("Explore messes")}</Link></section>}
+  </CustomerPage></>;
 }

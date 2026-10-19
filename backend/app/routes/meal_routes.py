@@ -110,6 +110,8 @@ def skip_meal(
     current_user: models.User = Depends(get_current_user),
 ):
     ensure_not_dispatched(db, current_user.id, req.meal_id)
+    from app.a_la_carte import guard_extras
+    guard_extras(db, current_user.id, req.meal_id)
     # Find meal
     meal = (
         db.query(models.Meal)

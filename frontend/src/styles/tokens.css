@@ -1,0 +1,133 @@
+/* Batch 1 foundations. Light is the shipped theme; dark tokens are reserved
+   for the separately verified dark-mode rollout. No theme switch is exposed. */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Lora:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap');
+
+:root {
+  color-scheme: light;
+  --color-brand: #17774e;
+  --color-brand-hover: #10613e;
+  --color-brand-active: #0b4c30;
+  --color-on-brand: #fff;
+  --color-secondary: #e4f6eb;
+  --color-accent: #f7ce68;
+  --color-mint: #e4f6eb;
+  --color-peach: #fff0e3;
+  --color-lilac: #f0ecff;
+  --color-sky: #e9f3ff;
+  --color-lemon: #fff6cf;
+  --color-lilac-ink: #615098;
+  --color-sky-ink: #315f8b;
+  --color-on-accent: #48320d;
+  --color-accent-ink: #805411;
+  --color-canvas: #f7faf7;
+  --color-surface: #fff;
+  --color-surface-subtle: #f0f2eb;
+  --color-text: #20382a;
+  --color-text-muted: #58685c;
+  --color-border: #dce3d8;
+  --color-control-border: #7b8c7e;
+  --color-focus: #256343;
+  --color-success: #21603d;
+  --color-success-subtle: #edf6ef;
+  --color-warning: #805411;
+  --color-warning-subtle: #fff4d9;
+  --color-danger: #b33332;
+  --color-danger-subtle: #fff0ee;
+  --color-info: #235d82;
+  --color-info-subtle: #edf5fa;
+
+  /* Compatibility aliases for existing feature CSS, migrated gradually. */
+  --ink: var(--color-text);
+  --teal: var(--color-brand);
+  --coral: var(--color-danger);
+  --citrus: var(--color-accent);
+
+  --font-body: 'DM Sans', 'Noto Sans Devanagari', system-ui, sans-serif;
+  --font-heading: var(--font-body);
+  --font-editorial: 'Lora', 'Noto Sans Devanagari', Georgia, serif;
+  --font-hindi: 'Noto Sans Devanagari', 'DM Sans', system-ui, sans-serif;
+  --text-meta: 0.8125rem;
+  --text-label: 0.875rem;
+  --text-body: 1rem;
+  --text-card: 1.125rem;
+  --text-section: 1.5rem;
+  --text-title: clamp(1.75rem, 3vw, 2.25rem);
+  --text-display: clamp(2rem, 4.5vw, 3.5rem);
+  --leading-body: 1.6;
+  --leading-heading: 1.25;
+  --tracking-heading: -0.02em;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --page-gutter: var(--space-8);
+  --layout-public: 1180px;
+  --layout-workspace: 1280px;
+  --layout-reading: 65ch;
+  --layout-auth: 440px;
+  --radius-control: 10px;
+  --radius-card: 20px;
+  --radius-dialog: 20px;
+  --radius-pill: 999px;
+  --shadow-small: 0 2px 6px rgba(20, 45, 30, .06);
+  --shadow-raised: 0 8px 24px rgba(20, 45, 30, .10);
+  --shadow-overlay: 0 16px 48px rgba(10, 25, 16, .20);
+  --duration-fast: 160ms;
+  --duration-panel: 200ms;
+  --layer-header: 20;
+  --layer-dropdown: 40;
+  --layer-chat: 50;
+  --layer-modal-backdrop: 80;
+  --layer-modal: 81;
+  --layer-toast: 100;
+}
+
+/* Token definitions only: legacy feature surfaces are not yet dark-ready. */
+:root[data-theme='dark'] {
+  --color-brand: #8bd4a7;
+  --color-brand-hover: #ade7c3;
+  --color-brand-active: #70c491;
+  --color-on-brand: #102318;
+  --color-secondary: #243b2c;
+  --color-accent-ink: #f2c66d;
+  --color-canvas: #131b17;
+  --color-surface: #1c2821;
+  --color-surface-subtle: #243329;
+  --color-text: #edf3ec;
+  --color-text-muted: #b7c5b8;
+  --color-border: #405246;
+  --color-control-border: #82998a;
+  --color-focus: #a5e2b8;
+  --color-success: #91dbae;
+  --color-success-subtle: #213b2b;
+  --color-warning: #f2c66d;
+  --color-warning-subtle: #3b321d;
+  --color-danger: #ffaaa6;
+  --color-danger-subtle: #422726;
+  --color-info: #a1d3f2;
+  --color-info-subtle: #203440;
+}
+
+:root:lang(hi) {
+  --font-body: var(--font-hindi);
+  --font-heading: var(--font-hindi);
+  --font-editorial: var(--font-hindi);
+  --leading-body: 1.7;
+  --leading-heading: 1.45;
+  --tracking-heading: normal;
+}
+
+@media (max-width: 1023px) {
+  :root { --page-gutter: var(--space-6); }
+}
+
+@media (max-width: 639px) {
+  :root { --page-gutter: var(--space-4); }
+}

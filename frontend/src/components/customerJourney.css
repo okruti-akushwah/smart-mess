@@ -1,5 +1,210 @@
-.journey-page{display:grid;gap:24px}.journey-page .welcome{margin:0}.address-card{width:min(100%,760px);margin:16px auto;padding:40px}.address-card h1{font-size:clamp(26px,4vw,36px);line-height:1.2}.journey-form{display:grid;gap:22px;margin-top:28px}.journey-form .btn{justify-self:start}.food-choice-tabs{display:flex;gap:8px;padding:6px;background:#fff;border:1px solid #dce5d8;border-radius:16px}.food-choice-tabs button{flex:1;border:0;padding:16px;border-radius:11px;background:transparent;color:#34564a;font:inherit;font-weight:700;cursor:pointer}.food-choice-tabs button.selected{background:#176c46;color:white}.plan-start{max-width:300px;margin-bottom:24px}.purchase-card{display:flex;flex-direction:column;gap:12px}.purchase-card h2,.purchase-card h3,.purchase-card p{margin:0}.purchase-card .btn{margin-top:auto}.purchase-price{font-size:28px;font-weight:800;color:#176c46}.purchase-price small{font-size:15px;font-weight:400;color:#667c75}.checkout-reminder{display:flex;align-items:center;justify-content:space-between;gap:20px}.meal-review-card{display:grid;grid-template-columns:180px 1fr;gap:28px}.meal-review-card .review-photo{width:180px;height:180px;object-fit:cover;border-radius:16px}.review-form{display:grid;gap:14px}.review-form textarea{width:100%}.history-meal-row{display:flex;gap:20px;align-items:center;padding:20px 0;border-bottom:1px solid #e5eae3}.history-meal-row:last-child{border-bottom:0}.history-meal-row .meal-thumbnail{width:96px;height:96px;flex-shrink:0;border-radius:12px;object-fit:cover}.history-meal-row p{margin:6px 0}.history-meal-row .history-meal-info{flex:1}.journey-footnote{line-height:1.7}.owner-feedback-stars{color:#ad760d;letter-spacing:3px;font-size:22px}.feedback-list{max-height:650px;overflow:auto}@media(max-width:640px){.address-card{padding:24px}.food-choice-tabs{flex-direction:column}.checkout-reminder{align-items:start;flex-direction:column}.meal-review-card{grid-template-columns:1fr}.meal-review-card .review-photo{width:100%;height:180px}.history-meal-row{flex-wrap:wrap}.history-meal-row .meal-thumbnail{width:72px;height:72px}.history-meal-row .history-meal-info{min-width:160px}}
+.owner-feedback-stars{color:#ad760d;letter-spacing:3px;font-size:22px}.feedback-list{max-height:650px;overflow:auto}
+.feedback-list .history-meal-row{display:flex;gap:20px;align-items:center;padding:20px 0;border-bottom:1px solid #e5eae3}.feedback-list .history-meal-row:last-child{border-bottom:0}.feedback-list .meal-thumbnail{width:96px;height:96px;flex-shrink:0;border-radius:12px;object-fit:cover}.feedback-list .history-meal-row p{margin:6px 0}.feedback-list .history-meal-info{flex:1}
+@media(max-width:640px){.feedback-list .history-meal-row{flex-wrap:wrap}.feedback-list .meal-thumbnail{width:72px;height:72px}.feedback-list .history-meal-info{min-width:160px}}
 
-.review-photo{width:240px;max-width:100%;height:160px;object-fit:cover;border-radius:14px}.journey-page>section{margin-bottom:0}.journey-page .welcome{padding:32px;background:#eaf0e5;border-radius:22px}.purchase-card .food-cover{height:200px}.customer-navbar .nav-links{flex-wrap:nowrap;overflow-x:auto;min-width:0}.customer-navbar .nav-links>a{white-space:nowrap;flex-shrink:0}.customer-navbar .nav-links>[role="status"]{flex-shrink:0}@media(max-width:1100px){.customer-navbar{flex-wrap:wrap}.customer-navbar .nav-links{order:3;flex-basis:100%;justify-content:flex-start}.customer-navbar .nav-right{margin-left:auto}}@media(max-width:640px){.journey-page .welcome{padding:24px}.journey-page .welcome h1{font-size:30px}}
+/* Customer route foundations. Shared owner/payment components keep their own defaults. */
+.dashboard.customer-page {
+  display: grid;
+  gap: 24px;
+  width: min(100%, 1280px);
+  margin: 0 auto;
+  padding: 32px;
+  color: var(--color-text);
+}
+.customer-page > *, .customer-page .meal-form > *, .customer-page .request-row > * { min-width: 0; }
+.dashboard.customer-page > section:not(.welcome), .dashboard.customer-page > .stats-grid { margin: 0; }
+.customer-page :is(h1,h2,h3,p,strong,small,a) { overflow-wrap: anywhere; }
+.customer-page h1 { font-size: var(--text-title); line-height: var(--leading-heading); margin: 8px 0 12px; letter-spacing: normal; }
+.customer-page h2 { font-size: 24px; line-height: var(--leading-heading); margin: 0 0 16px; }
+.customer-page h3 { font-size: 20px; line-height: var(--leading-heading); }
+.customer-page p { font-size: 16px; line-height: var(--leading-body); }
+.customer-page .muted, .customer-page small { color: var(--color-text-muted); }
+.customer-page .eyebrow { font-size: 13px; letter-spacing: .06em; color: var(--color-accent-ink); }
+:root:lang(hi) .customer-page .eyebrow { letter-spacing: normal; }
+.customer-page .management-card, .customer-page .meal-card, .customer-page .stat-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: none;
+  padding: 24px;
+  transform: none;
+}
+.dashboard.customer-page .welcome {
+  background: linear-gradient(110deg,var(--color-mint),var(--color-surface) 70%,var(--color-lemon));
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-top: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 24px;
+  margin: 0;
+  box-shadow: none;
+}
+.customer-page .welcome::before, .customer-page .welcome::after, .customer-page .customer-overview::before { display: none; }
+.customer-page .welcome > div { max-width: none; }
+.customer-page .customer-overview { display:flex; justify-content:space-between; align-items:center; gap:20px; background:linear-gradient(120deg,var(--color-mint),var(--color-surface) 60%,var(--color-lilac)); border:1px solid var(--color-border); border-radius:24px; padding:20px 24px; color:var(--color-text); box-shadow:none; }
+.customer-page .customer-overview h1 { font-size: 28px; margin:4px 0; }
+.customer-page .customer-overview-copy > p { margin:4px 0; font-size:16px; color:var(--color-text-muted); }
+.customer-page .customer-overview-copy > .eyebrow { font-size: 13px; color: var(--color-accent-ink); }
+.customer-page .welcome p, .customer-page .customer-overview > p, .customer-page .customer-overview details {
+  font-size: 16px;
+  color: var(--color-text-muted);
+  max-width: 70ch;
+}
+.customer-page .customer-overview details { margin: 4px 0 0; }
+.customer-page .customer-overview summary { min-height: 44px; padding-block: 10px; cursor: pointer; color: var(--color-brand); }
+.customer-page .welcome .btn-primary, .customer-page .customer-overview .btn-primary {
+  background: var(--color-brand); color: var(--color-on-brand); box-shadow: none;
+}
+.customer-page .welcome .btn-primary:hover:not(:disabled), .customer-page .customer-overview .btn-primary:hover:not(:disabled) {
+  background: var(--color-brand-hover); color: var(--color-on-brand);
+}
+.customer-page .welcome .btn-outline, .customer-page .customer-overview .btn-outline { background: var(--color-surface); color: var(--color-brand); border-color: var(--color-control-border); }
+.customer-page .form-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.customer-page a:not(.btn) { text-underline-offset: 3px; }
+.customer-page .btn { min-height: 44px; white-space: normal; line-height: 1.5; transform: none; }
+.customer-page .btn:disabled { cursor: not-allowed; }
+.customer-page .section-heading { align-items: center; gap: 16px; margin-bottom: 16px; }
+.customer-page .section-heading h2 { margin: 4px 0 0; }
+.customer-page .day-switch { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }
+.customer-page .day-switch button { min-height: 44px; border-radius: var(--radius-control); padding: 10px 16px; font-size: 14px; text-transform: none; }
+.customer-page .day-switch button[aria-pressed='true'] { background: var(--color-brand); color: var(--color-on-brand); border-color: var(--color-brand); }
+.customer-page .meal-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 24px; }
+.customer-page .meal-card { display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
+.customer-page .meal-card .food-cover { width: calc(100% + 48px); max-width: none; height: auto; aspect-ratio: 4/3; object-fit: cover; margin: -24px -24px 4px; transform: none; }
+.customer-page .meal-card h3, .customer-page .meal-card p { margin: 0; }
+.customer-page .meal-card p { font-size: 14px; color: var(--color-text-muted); }
+.customer-page .meal-top { align-items: flex-start; flex-wrap: wrap; gap: 8px; }
+.customer-page .meal-type { font-size: 13px; font-weight: 600; text-transform: none; color: var(--color-brand); }
+.customer-page .history-status, .customer-page .status-badge { max-width: 100%; font-size: 13px; line-height: 1.6; letter-spacing: normal; text-transform: none; white-space: normal; }
+.customer-page .status-badge.status-pending { background:var(--color-warning-subtle); color:var(--color-warning); }
+.customer-page .status-badge.status-rejected { background:var(--color-danger-subtle); color:var(--color-danger); }
+.customer-page .status-badge.status-approved { background:var(--color-success-subtle); color:var(--color-success); }
+.customer-page .meal-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 8px; }
+.customer-page .meal-actions .btn { flex: 1 1 auto; }
+.customer-page .stats-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; }
+.customer-page .stat-card { min-height: 0; }
+.member-dashboard .stats-grid .stat-card { border-top:3px solid var(--color-brand); }
+.member-dashboard .stats-grid .stat-card:nth-child(2) { border-top-color:var(--color-accent-ink); background:var(--color-lemon); }
+.member-dashboard .stats-grid .stat-card:nth-child(3) { border-top-color:var(--color-lilac-ink); background:var(--color-lilac); }
+.customer-page .stat-card .stat-icon { display:inline-grid; place-items:center; width:40px; height:40px; border-radius:12px; background:var(--color-mint); color:var(--color-brand); margin-bottom:12px; }
+.customer-page .stat-card > span { font-size: 14px; color: var(--color-text-muted); }
+.customer-page .stat-card > strong { display: block; font-size: 32px; color: var(--color-text); margin: 8px 0; font-variant-numeric: tabular-nums; }
+.customer-page .stat-card p { font-size: 14px; margin: 0; color: var(--color-text-muted); }
+.customer-page .customer-plan-row, .customer-page .request-row { padding: 20px 0; margin: 0; border: 0; border-bottom: 1px solid var(--color-border); border-radius: 0; gap: 16px; }
+.customer-page .customer-plan-row:last-child, .customer-page .request-row:last-child { border-bottom: 0; }
+.customer-page .request-row { display: flex; flex-wrap: wrap; align-items: center; background: transparent; }
+.customer-page .request-row > div:first-child { flex: 1 1 260px; }
+.customer-page .request-row p, .customer-page .customer-plan-row p { font-size: 16px; margin: 8px 0; color: var(--color-text-muted); }
+.customer-page .request-row small { display: block; font-size: 14px; line-height: 1.6; }
+.customer-page .empty-card, .customer-page .loading-card { padding: 24px; border: 1px solid var(--color-border); box-shadow: none; background: var(--color-surface); font-size: 16px; }
+.customer-page .meal-grid > .empty-card { grid-column: 1/-1; }
+.customer-page .today-menu-section .meal-card .food-cover { height:112px; aspect-ratio:auto; }
+.customer-page .today-menu-section .section-heading { margin-top:0; }
+.customer-page .alert { margin: 0; padding: 16px; font-size: 16px; line-height: 1.6; }
+.customer-page .address-card { width: min(100%,760px); justify-self: center; }
+.customer-page .journey-form { display: grid; gap: 24px; margin-top: 24px; }
+.customer-page .journey-form .btn { justify-self: start; }
+.customer-page .meal-form { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 24px; margin-top: 24px; }
+.customer-page .meal-form > .form-actions, .customer-page .meal-form > .payment-options, .customer-page .meal-form > .action-feedback, .customer-page .meal-form > .form-wide { grid-column: 1/-1; }
+.customer-page .form-field { font-size: 16px; color: var(--color-text); line-height: 1.6; }
+.customer-page .form-field :is(input,select,textarea) { width: 100%; min-width: 0; border-color: var(--color-control-border); font-size: 16px; border-radius: var(--radius-control); }
+.customer-page input[type=file] { overflow: hidden; padding: 10px; }
+.customer-page .plan-start { max-width: 320px; margin-bottom: 24px; }
+.customer-page .catalog-heading { padding:0; }
+.customer-page .catalog-heading .eyebrow { margin:0; }
+.customer-page .catalog-heading h1 { margin:4px 0 8px; }
+.customer-page .catalog-heading p { margin:8px 0; max-width:65ch; color:var(--color-text-muted); }
+.customer-page .catalog-heading .form-actions { margin-top:12px; }
+.customer-page .catalog-filters { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin:16px 0; }
+.customer-page .catalog-tools { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px 24px; }
+.customer-page .catalog-tools > p { margin:0; }
+.customer-page .catalog-tools > details[open] { flex-basis:100%; }
+.customer-page .catalog-result-count { font-size:14px; color:var(--color-text-muted); }
+.customer-page .catalog-image-note, .customer-page .purchase-step-hint { font-size:14px; color:var(--color-text-muted); }
+.customer-page .catalog-more { margin-top:20px; }
+.customer-page .plan-terms { margin:12px 0; }
+.customer-page .plan-terms summary, .customer-page .catalog-filter-disclosure summary { min-height:44px; padding:10px 0; color:var(--color-brand); cursor:pointer; }
+.customer-page .plan-date-helper { display:grid; justify-items:start; gap:8px; margin:16px 0 24px; padding:16px; border-left:3px solid var(--color-brand); background:var(--color-mint); }
+.customer-page .plan-date-helper p { margin:0; }
+.customer-page .plan-catalog { display:grid; grid-template-columns:280px minmax(0,1fr); align-items:start; gap:24px; }
+.customer-page .plan-catalog .meal-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.customer-page .meal-grid > .purchase-card { margin:0; }
+.customer-page .plan-catalog > .empty-card { grid-column:1/-1; }
+@media(width < 1024px) { .customer-page .plan-catalog { grid-template-columns:1fr; } }
+@media(width < 640px) { .customer-page .plan-catalog .meal-grid { grid-template-columns:1fr; } }
+.customer-page .checkout-reminder .form-actions { flex:0 1 300px; }
+@media(width < 640px) { .customer-page .catalog-filters { grid-template-columns:1fr; gap:12px; } .customer-page .catalog-heading h1 { font-size:26px; } .customer-page .checkout-reminder .form-actions { flex-basis:auto; } }
+.customer-page .purchase-card { display: flex; flex-direction: column; gap: 12px; }
+.customer-page .purchase-card h2, .customer-page .purchase-card h3, .customer-page .purchase-card p { margin: 0; }
+.customer-page .purchase-card .btn { margin-top: auto; }
+.customer-page .purchase-price { font-size: 28px; font-weight: 700; color: var(--color-brand); font-variant-numeric: tabular-nums; }
+.customer-page .purchase-price small { font-size: 14px; font-weight: 400; }
+.customer-page .checkout-reminder { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.customer-page .meal-review-card { display: grid; grid-template-columns: 180px minmax(0,1fr); gap: 24px; }
+.customer-page .review-photo { width: 240px; max-width: 100%; height: 180px; object-fit: cover; border-radius: var(--radius-control); }
+.customer-page .meal-review-card .review-photo { width: 180px; }
+.customer-page .review-form { display: grid; gap: 16px; }
+.customer-page .history-meal-row { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--color-border); }
+.customer-page .history-meal-row:last-child { border-bottom: 0; }
+.customer-page .history-meal-row .meal-thumbnail { width: 80px; height: 80px; flex-shrink: 0; border-radius: var(--radius-control); object-fit: cover; }
+.customer-page .history-meal-info { flex: 1 1 180px; min-width: 0; }
+.customer-page .history-meal-info p { margin: 6px 0; color: var(--color-text-muted); }
+.customer-page .journey-footnote { color: var(--color-text-muted); line-height: 1.7; }
+.customer-page .bills-heading { display: flex; justify-content: space-between; align-items: center; gap: 24px; }
+.customer-page .bills-pending-total { padding: 16px 24px; border-radius: var(--radius-control); background: var(--color-secondary); min-width: 200px; }
+.customer-page .bills-pending-total span, .customer-page .bills-pending-total small { display: block; font-size: 14px; }
+.customer-page .bills-pending-total strong { display: block; font-size: 32px; color: var(--color-brand); font-variant-numeric: tabular-nums; }
+.customer-page .bill-summary { grid-template-columns: repeat(3,minmax(0,1fr)); box-shadow: none; }
+.customer-page .bill-summary > p { grid-column: 1/-1; padding: 20px 24px; margin: 0; border-bottom: 1px solid var(--color-border); }
+.customer-page .bill-stat span { font-size: 14px; color: var(--color-text-muted); }
+.customer-page .payment-options { box-shadow: none; }
+.customer-page .payment-options-qr-only { border: 0; padding: 0; }
+.bill-breakdown { width: 100%; min-width: 0; }
+.bill-breakdown dl { margin: 16px 0; }
+.bill-breakdown dl > div { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 8px 0; }
+.bill-breakdown dt { color: var(--color-text-muted); overflow-wrap: anywhere; }
+.bill-breakdown dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bill-breakdown .bill-breakdown-total { border-top: 1px solid var(--color-border); }
+.customer-page .bill-summary > .bill-breakdown { grid-column: 1/-1; padding: 0 24px; }
+.bill-record > div { min-width: 0; width: 100%; }
+.bill-record-status strong { color: var(--color-brand); }
+.bill-record summary { cursor: pointer; font-weight: 600; padding-block: 12px; }
+.bill-record:focus { outline: 2px solid var(--color-focus); outline-offset: 4px; }
+@media (width < 1024px) {
+  .customer-page .meal-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .dashboard.customer-page { padding: 24px; }
+}
+@media (width < 640px) {
+  .dashboard.customer-page { padding: 24px 16px; }
+  .customer-page .customer-overview h1 { font-size:24px; }
+  .customer-page .management-card, .customer-page .meal-card, .customer-page .stat-card, .dashboard.customer-page .welcome { padding: 20px; }
+  .customer-page .meal-grid, .customer-page .stats-grid, .customer-page .meal-form, .customer-page .meal-review-card, .customer-page .bill-summary { grid-template-columns: minmax(0,1fr); }
+  .customer-page .meal-card .food-cover { width: calc(100% + 40px); margin: -20px -20px 4px; }
+  .customer-page .checkout-reminder, .customer-page .bills-heading { flex-direction: column; align-items: stretch; }
+  .customer-page .meal-review-card .review-photo { width: 100%; }
+  .customer-page .bills-pending-total { min-width: 0; }
+  .customer-page .section-heading { flex-wrap: wrap; }
+  .customer-page .bill-stat { border-right: 0; border-bottom: 1px solid var(--color-border); }
+}
 
-.bills-heading{display:flex;align-items:center;justify-content:space-between;gap:24px}.bills-pending-total{text-align:right;flex-shrink:0;padding:16px 22px;border:1px solid #dce5d8;border-radius:16px;background:#fff}.bills-pending-total span,.bills-pending-total small{display:block;color:#65756c}.bills-pending-total strong{display:block;font-size:32px;line-height:1.3;color:#176c46;margin:6px 0}.bills-pending-total small{font-size:13px}@media(max-width:640px){.bills-heading{align-items:stretch;flex-direction:column}.bills-pending-total{align-self:flex-end}.bills-pending-total strong{font-size:28px}}
+/* Reserve the end of workspace content for the existing floating chat control. */
+.dashboard.customer-page { padding-bottom:calc(96px + env(safe-area-inset-bottom)); }
+.member-dashboard .meal-card:target { outline: 2px solid var(--color-focus); outline-offset: 4px; }
+
+/* Shared, bounded controls for date-scoped meals and account history. */
+.meal-date-controls,.history-filters{display:flex;flex-wrap:wrap;align-items:end;gap:12px;margin:16px 0}
+.meal-date-controls label,.history-filters label{display:grid;gap:6px;flex:1 1 160px;min-width:0;font-weight:600;font-size:14px}
+.meal-date-controls select,.history-filters select,.history-filters input:not([type="checkbox"]){width:100%;min-height:44px;box-sizing:border-box;padding:10px 12px;border:1px solid var(--color-control-border);border-radius:10px;background:var(--color-surface);color:var(--color-text);font:inherit}
+.meal-date-controls select:focus-visible,.history-filters :is(select,input):focus-visible{outline:3px solid var(--color-focus);outline-offset:2px}
+.member-dashboard .meal-card .food-cover{height:128px;object-fit:cover}
+@media(max-width:540px){
+.history-filters label{flex-basis:100%}.history-filters .btn{flex:1 1 auto}
+.member-dashboard .meal-date-controls label{flex:1 1 140px}.member-dashboard .meal-date-controls .btn{flex:0 1 auto}
+.customer-page.member-dashboard .customer-overview{padding:14px 16px}.customer-page.member-dashboard .customer-overview h1{font-size:22px}.member-dashboard .customer-overview-copy>.eyebrow{display:none}
+.customer-page.member-dashboard .today-menu-section .meal-card{display:grid;grid-template-columns:minmax(0,1fr) 64px;gap:8px}
+.customer-page.member-dashboard .today-menu-section .meal-card>.food-cover{grid-column:2;grid-row:1/3;width:64px;height:64px;margin:0;aspect-ratio:auto;border-radius:10px}
+.customer-page.member-dashboard .today-menu-section .meal-card>:not(.food-cover){grid-column:1/-1}
+.customer-page.member-dashboard .today-menu-section .meal-card>.meal-top,.customer-page.member-dashboard .today-menu-section .meal-card>h3{grid-column:1}
+}
+
+.history-filters label:has(input[type="checkbox"]){display:flex;align-items:center;gap:10px;min-height:44px}.history-filters input[type="checkbox"]{width:22px;height:22px;flex:none;min-height:0}

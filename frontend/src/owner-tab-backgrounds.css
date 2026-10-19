@@ -1,17 +1,169 @@
-/* Light overlays keep page headings readable over the illustrations. */
-.dashboard .welcome, .owner-dashboard .welcome.owner-welcome {
-  --owner-hero-overlay: linear-gradient(90deg, rgba(255,252,244,.98) 0%, rgba(255,252,244,.95) 40%, rgba(255,252,244,.58) 65%, rgba(255,252,244,.12) 100%);
+/* Owner presentation foundation: replaces the previous page-image overrides.
+   Scoped to OwnerPage so shared customer/payment tools retain their own styles. */
+.dashboard.owner-page { display:grid; gap:24px; width:min(100%,1280px); max-width:1280px; margin-inline:auto; padding:32px; color:var(--color-text); }
+.owner-page > *, .owner-page form > *, .owner-page .request-row > *, .owner-page .management-row > * { min-width:0; }
+.dashboard.owner-page > section:not(.welcome), .dashboard.owner-page > .stats-grid { margin:0; }
+.owner-page :is(h1,h2,h3,h4,p,strong,small,a) { overflow-wrap:anywhere; }
+.owner-page h1 { font-size:var(--text-title); line-height:var(--leading-heading); letter-spacing:normal; margin:8px 0 12px; }
+.owner-page h2 { font-size:24px; line-height:var(--leading-heading); letter-spacing:normal; margin:0 0 16px; }
+.owner-page h3 { font-size:20px; line-height:var(--leading-heading); letter-spacing:normal; }
+.owner-page p { font-size:16px; line-height:var(--leading-body); }
+.owner-page .muted, .owner-page small { color:var(--color-text-muted); }
+.owner-page .eyebrow { font-size:13px; letter-spacing:.06em; color:var(--color-accent-ink); }
+:root:lang(hi) .owner-page .eyebrow { letter-spacing:normal; }
+.owner-page :is(.management-card,.headcount-card,.stat-card,.empty-card,.loading-card) { padding:24px; background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-card); box-shadow:none; transform:none; }
+.dashboard.owner-page .welcome, .owner-page .owner-onboarding-hero, .owner-page .advisor-hero {
+ background:linear-gradient(110deg,var(--color-mint),var(--color-surface) 70%,var(--color-lemon)); color:var(--color-text); border:1px solid var(--color-border); border-radius:var(--radius-card); padding:24px; min-height:0; margin:0; box-shadow:none;
 }
-.owner-workspace-customers .welcome.owner-welcome { background-image: var(--owner-hero-overlay), url('/src/assets/owner-members-hero.png'); }
-.owner-workspace-requests .welcome.owner-welcome { background-image: var(--owner-hero-overlay), url('/src/assets/owner-requests-hero.png'); }
-.owner-workspace-plans .welcome.owner-welcome { background-image: var(--owner-hero-overlay), url('/src/assets/owner-plans-hero.png'); }
-.owner-workspace-bills .welcome.owner-welcome { background-image: var(--owner-hero-overlay), url('/src/assets/owner-bills-hero.png'); }
-.owner-workspace-settings .welcome.owner-welcome { background-image: var(--owner-hero-overlay), url('/src/assets/owner-settings-hero.png'); }
-.owner-payments-page .welcome.owner-welcome { background-image: var(--owner-hero-overlay), url('/src/assets/owner-payments-hero.png'); }
-.owner-reviews-page .welcome.owner-welcome { background-image: var(--owner-hero-overlay), url('/src/assets/owner-reviews-hero.png'); }
+.owner-page .welcome::before,.owner-page .welcome::after { display:none; }
+.dashboard.owner-page .welcome:has(.welcome-artwork) { display:grid; grid-template-columns:minmax(0,1fr) 230px; align-items:center; gap:24px; }
+.owner-page .welcome > div, .owner-page .advisor-hero > div { max-width:none; }
+.owner-page .welcome h1, .owner-page .advisor-hero h1 { color:var(--color-text); }
+.owner-page .welcome p, .owner-page .advisor-hero p:not(.eyebrow) { font-size:16px; color:var(--color-text-muted); max-width:70ch; }
+.owner-page .welcome .eyebrow, .owner-page .advisor-hero .eyebrow { font-size:13px; color:var(--color-accent-ink); }
+.owner-page .welcome .btn-primary { background:var(--color-brand); color:var(--color-on-brand); box-shadow:none; }
+.owner-page .welcome .btn-primary:hover:not(:disabled) { background:var(--color-brand-hover); color:var(--color-on-brand); }
+.owner-page .welcome .btn-outline { background:var(--color-surface); color:var(--color-brand); border-color:var(--color-control-border); }
+.owner-page .owner-public-start { display:block; margin:0; padding:12px 24px; background:var(--color-secondary); border:1px solid var(--color-border); border-radius:var(--radius-card); }
+.owner-page .owner-public-start > summary { color:var(--color-brand); font-size:14px; font-weight:600; }
+.owner-page .owner-public-start[open] > .btn { margin-top:16px; }
+.owner-page .welcome h1 { font-size:28px; }
+.owner-page .owner-dashboard-heading { display:flex; justify-content:space-between; align-items:center; gap:20px; padding:20px 24px; border:1px solid var(--color-border); border-radius:24px; background:linear-gradient(120deg,var(--color-mint),var(--color-surface) 60%,var(--color-lilac)); }
+.owner-page .owner-dashboard-heading h1 { font-size:28px; margin:4px 0; }
+.owner-page .owner-dashboard-heading h2 { font-size:20px; margin:4px 0; color:var(--color-text-muted); }
+.owner-page .owner-dashboard-heading p { margin:4px 0; color:var(--color-text-muted); }
+.owner-page .owner-dashboard-heading .eyebrow { color:var(--color-accent-ink); }
+.owner-page .workspace-heading { padding:0; background:none; border:0; }
+.owner-page .workspace-heading h1 { margin:4px 0 8px; }
+.owner-page .workspace-heading p { margin:8px 0; max-width:65ch; color:var(--color-text-muted); }
+.owner-page .workspace-heading .eyebrow { color:var(--color-accent-ink); }
+.owner-page .workspace-section-links { display:flex; flex-wrap:wrap; gap:12px; }
+.owner-page .workspace-section-links a { min-height:44px; display:inline-flex; align-items:center; padding:8px 16px; border:1px solid var(--color-control-border); border-radius:var(--radius-control); background:var(--color-surface); text-underline-offset:3px; }
+.owner-page #member-subscriptions, .owner-page #subscription-plans { scroll-margin-top:24px; }
+.owner-page .request-row.member-record { display:grid; grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr) minmax(0,1.2fr); align-items:start; gap:24px; }
+.owner-page .member-record h3 { margin:0 0 8px; font-size:18px; }
+.owner-page .member-record p { margin:4px 0 8px; font-size:14px; }
+.owner-page .member-search-count { display:flex; align-items:center; flex-wrap:wrap; gap:16px; color:var(--color-text-muted); font-size:14px; }
+.owner-page .member-record .status-badge { display:inline-block; }
+.owner-page .request-row .action-feedback { flex-basis:100%; }
+.owner-page .management-card > .section-heading:first-child { margin-top:0; }
+.owner-workspace-requests #payment-confirmations > .management-card { margin:0; }
+@media(width < 900px) { .owner-page .request-row.member-record { grid-template-columns:1fr; gap:8px; } }
+.owner-page .current-meal-summary > h2 { margin-bottom:8px; }
+.owner-page .current-meal-summary > p { margin:8px 0; }
+.owner-page .current-meal-summary { border-top:3px solid var(--color-brand); }
+.owner-page .current-meal-summary .stat-card { padding:16px; background:var(--color-mint); border:0; border-radius:16px; }
+.owner-page .current-meal-summary .stat-card:nth-child(2) { background:var(--color-lemon); }
+.owner-page .current-meal-summary .stat-card:nth-child(3) { background:var(--color-lilac); }
+.owner-page .current-meal-summary .stat-icon { float:right; width:32px; height:32px; margin:0 0 8px 8px; }
+.owner-page .current-meal-summary .stat-card > strong { margin:4px 0; }
+.owner-page .owner-public-start > div { flex:1 1 360px; }
+.owner-page .owner-public-start h2 { font-size:20px; margin:4px 0 8px; }
+.owner-page .owner-public-start p { margin:4px 0; color:var(--color-text-muted); }
+.owner-page .btn { min-height:44px; white-space:normal; line-height:1.5; transform:none; }
+.owner-page .form-actions,.owner-page .row-actions { display:flex; flex-wrap:wrap; align-items:center; gap:12px; }
+.owner-page .section-heading { align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:20px; }
+.owner-page .section-heading h2 { margin:4px 0; }
+.owner-page .request-row { display:flex; flex-wrap:wrap; align-items:center; gap:16px; padding:20px 0; margin:0; background:transparent; border:0; border-bottom:1px solid var(--color-border); border-radius:0; }
+.owner-page .request-row:last-child { border-bottom:0; }
+.owner-page .request-row > div:first-child { flex:1 1 280px; min-width:0; }
+.owner-page .request-row p { font-size:16px; color:var(--color-text-muted); margin:8px 0; }
+.owner-page .request-row small { display:block; font-size:14px; line-height:1.6; }
+.owner-page .management-card > .management-card { margin-top:20px; background:var(--color-surface-subtle); }
+.owner-page .alert { font-size:16px; line-height:1.6; padding:16px; }
+.owner-page .meal-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px; margin-top:24px; }
+.owner-page .meal-form > .form-wide, .owner-page .meal-form > .form-actions { grid-column:1/-1; }
+.owner-page .form-field { font-size:16px; line-height:1.6; color:var(--color-text); }
+.owner-page .form-field :is(input:not([type=checkbox]):not([type=radio]),select,textarea), .owner-page .advisor-period select { width:100%; min-width:0; min-height:48px; font-size:16px; color:var(--color-text); border:1px solid var(--color-control-border); border-radius:var(--radius-control); background:var(--color-surface); }
+.owner-page .form-field :is(input,select,textarea):disabled { opacity:1; color:var(--color-text-muted); background:var(--color-surface-subtle); }
+.owner-page .field-pencil { min-width:44px; min-height:44px; }
+.owner-page .is-locked { padding:12px; border-radius:var(--radius-control); background:var(--color-surface-subtle); }
+.owner-page .timing-row { display:grid; grid-template-columns:minmax(130px,1fr) repeat(2,minmax(0,1fr)); gap:16px; align-items:end; }
+.owner-page .timing-toggle, .owner-page .plan-meal-option { min-height:44px; align-items:center; }
+.owner-page :is(input[type=checkbox],input[type=radio]) { accent-color:var(--color-brand); }
+.owner-page .stats-grid, .owner-page .meal-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
+.owner-page .stat-card { min-height:0; }
+.owner-page .stat-card .stat-icon { display:inline-grid; place-items:center; width:40px; height:40px; border-radius:12px; background:var(--color-mint); color:var(--color-brand); margin-bottom:12px; }
+.owner-page .stat-card > span { font-size:14px; color:var(--color-text-muted); }
+.owner-page .stat-card > strong { display:block; font-size:36px; margin:8px 0; color:var(--color-text); font-variant-numeric:tabular-nums; }
+.owner-page .stat-card p { margin:0; font-size:14px; color:var(--color-text-muted); }
+.owner-page .day-switch { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:20px; }
+.owner-page .day-switch button { min-height:44px; border-radius:var(--radius-control); font-size:14px; text-transform:none; }
+.owner-page .day-switch button[aria-pressed=true] { background:var(--color-brand); color:var(--color-on-brand); border-color:var(--color-brand); }
+.owner-page .headcount-more { margin-top:20px; }
+.owner-page .headcount-card { display:grid; grid-template-rows:subgrid; grid-row:span 6; gap:12px; padding:20px; border-radius:16px; }
+.owner-page .headcount-heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+.owner-page .headcount-card .meal-type { padding:0; border-radius:0; background:none; font-size:14px; text-transform:capitalize; letter-spacing:normal; color:var(--color-brand); }
+.owner-page .headcount-heading time { font-size:14px; color:var(--color-text-muted); }
+.owner-page .headcount-card .headcount-menu { margin:0; font-size:16px; font-weight:600; line-height:var(--leading-body); }
+.owner-page .headcount-cutoff { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin:0; font-size:14px; color:var(--color-text-muted); }
+.headcount-state { display:inline-flex; align-items:center; gap:6px; }
+.headcount-state::before { content:""; width:7px; height:7px; flex:0 0 7px; border-radius:50%; background:currentColor; }
+.headcount-state.is-open { color:var(--color-brand); font-weight:600; }
+.headcount-state.is-closed { color:var(--color-text-muted); }
+.owner-page .headcount-total { display:flex; align-items:center; gap:12px; padding-top:4px; }
+.owner-page .big-number { margin:0; color:var(--color-text); font-size:36px; line-height:1.1; font-variant-numeric:tabular-nums; }
+.owner-page .big-number-label { margin:0; max-width:none; font-size:14px; line-height:var(--leading-body); color:var(--color-text-muted); }
+.owner-page .headcount-card .meal-mix { margin:0; height:3px; }
+.owner-page .headcount-details { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px 20px; margin:0; padding-top:12px; border-color:var(--color-border); }
+.owner-page .headcount-details > div { padding:0; gap:4px; border:0; border-radius:0; background:none; }
+.owner-page .headcount-details > div:first-child { padding:0; background:none; }
+.owner-page .headcount-details a { display:flex; flex-direction:column; align-items:stretch; min-height:44px; padding:0; gap:4px; border-radius:4px; text-underline-offset:3px; }
+.owner-page .headcount-details a:hover { background:none; color:var(--color-brand); }
+.owner-page .headcount-details span { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:14px; font-weight:500; line-height:var(--leading-body); color:var(--color-text-muted); }
+.owner-page .headcount-details span svg { flex-shrink:0; color:var(--color-brand); }
+.owner-page .headcount-details strong { display:block; margin:0; font-size:20px; font-weight:700; line-height:1.2; color:var(--color-text); }
+.owner-page .status-badge { font-size:14px; line-height:1.6; white-space:normal; text-transform:none; }
+.owner-page .status-badge.status-pending { background:var(--color-warning-subtle); color:var(--color-warning); }
+.owner-page .status-badge.status-rejected { background:var(--color-danger-subtle); color:var(--color-danger); }
+.owner-page .status-badge.status-approved { background:var(--color-success-subtle); color:var(--color-success); }
+.owner-page details > summary { min-height:44px; padding-block:10px; cursor:pointer; line-height:1.6; }
+.owner-page .management-row { flex-wrap:wrap; gap:20px; }
+.owner-page .management-info { flex:1 1 240px; min-width:0; }
+.owner-page .management-info h3 { font-size:18px; }
+.owner-page .management-row .row-actions { margin-left:0; }
+.owner-page .photo-heading p, .owner-page .photo-preview-footer, .owner-page .photo-ai-panel small { font-size:14px; line-height:1.6; }
+.owner-page .photo-heading .eyebrow { font-size:13px; letter-spacing:.06em; }
+.owner-page .photo-source { min-height:48px; }
+.owner-page .menu-dish-controls button { width:44px; height:44px; }
+.owner-page .menu-dish-controls button:focus-visible { outline:3px solid var(--color-focus); outline-offset:3px; }
+.owner-page .menu-dish-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.owner-page .photo-upload-zone:focus-within { outline:3px solid var(--color-focus); outline-offset:3px; }
+.owner-page .weekly-menu-editor { padding:24px; border:1px solid var(--color-border); border-radius:var(--radius-card); background:var(--color-surface); box-shadow:none; }
+.owner-page .weekly-menu-heading h2 { font-size:24px; letter-spacing:normal; line-height:var(--leading-heading); }
+.owner-page .weekly-menu-heading p, .owner-page .weekly-menu-selection-hint, .owner-page .weekly-menu-save-row p { font-size:16px; color:var(--color-text-muted); }
+.owner-page .weekly-menu-selector, .owner-page .weekly-menu-details { padding:20px; border:1px solid var(--color-border); background:var(--color-surface-subtle); border-radius:var(--radius-control); }
+.owner-page .weekly-menu-selectors label, .owner-page .weekly-menu-details label { font-size:16px; font-weight:500; }
+.owner-page .weekly-menu-selectors :is(input,select), .owner-page .weekly-menu-details textarea, .owner-page .weekly-meal-options input { min-height:48px; font-size:16px; border-color:var(--color-control-border); }
+.owner-page .weekly-overview-scroll { max-width:100%; border-color:var(--color-border); }
+.owner-page .weekly-overview :is(th,td) { font-size:14px; padding:16px; }
+.owner-page .weekly-overview td p { font-size:14px; color:var(--color-text); }
+.owner-page .weekly-overview thead th { background:var(--color-secondary); color:var(--color-brand); }
+.owner-page .weekly-slot-edit { min-height:44px; min-width:44px; font-size:14px; color:var(--color-brand); }
+.owner-page .meal-editor-modes { background:var(--color-surface-subtle); border:1px solid var(--color-border); border-radius:var(--radius-control); }
+.owner-page .meal-editor-modes button { min-height:44px; font-size:16px; }
+.owner-page .meal-editor-modes button[aria-pressed=true] { background:var(--color-brand); color:var(--color-on-brand); box-shadow:none; }
+.owner-page .meal-grid > .empty-card { grid-column:1/-1; }
+@media(width < 1100px) { .owner-page .meal-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(width < 1024px) { .dashboard.owner-page { padding:24px; } }
+@media(width < 640px) {
+ .dashboard.owner-page { padding:24px 16px; }
+ .dashboard.owner-page .welcome:has(.welcome-artwork) { grid-template-columns:minmax(0,1fr); }
+ .owner-page .welcome-artwork { display:none; }
+ .owner-page :is(.management-card,.headcount-card,.stat-card,.empty-card,.loading-card,.weekly-menu-editor), .dashboard.owner-page .welcome, .owner-page .owner-onboarding-hero, .owner-page .advisor-hero { padding:20px; }
+ .owner-page .meal-form,.owner-page .meal-grid,.owner-page .stats-grid,.owner-page .timing-row { grid-template-columns:minmax(0,1fr); }
+ .owner-page .weekly-menu-selector,.owner-page .weekly-menu-details { padding:16px; }
+ .owner-page .photo-workspace { grid-template-columns:minmax(0,1fr); }
+ .owner-page .photo-heading { flex-wrap:wrap; }
+ .owner-page .photo-source-options { grid-template-columns:minmax(0,1fr); }
+ .owner-page .menu-dish-grid { grid-template-columns:minmax(0,1fr); }
+ .owner-page .owner-public-start { padding:20px; }
+ .owner-page .headcount-details { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
 
-@media (max-width: 640px) {
-  .dashboard .welcome, .owner-dashboard .welcome.owner-welcome {
-    --owner-hero-overlay: linear-gradient(90deg, rgba(255,252,244,.97), rgba(255,252,244,.84) 60%, rgba(255,252,244,.55));
-  }
+@media(width < 380px) {
+ .owner-page .headcount-details span { font-size:13px; gap:6px; }
 }
+
+/* Reserve the end of workspace content for the existing floating chat control. */
+.dashboard.owner-page { padding-bottom:calc(96px + env(safe-area-inset-bottom)); }

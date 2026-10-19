@@ -204,3 +204,21 @@ def add_business_details(engine):
         for field in ('owner_name', 'business_type', 'tagline', 'food_type', 'service_type', 'operating_days', 'opening_time', 'closing_time', 'city', 'area', 'fssai_number', 'business_status'):
             if field not in columns:
                 connection.execute(text(f"ALTER TABLE mess_profiles ADD COLUMN {field} VARCHAR DEFAULT ''"))
+
+
+def add_kitchen_location(engine):
+    with migration_transaction(engine) as connection:
+        columns = {c['name'] for c in inspect(connection).get_columns('mess_profiles')}
+        for field in ('latitude', 'longitude'):
+            if field not in columns:
+                connection.execute(text(f'ALTER TABLE mess_profiles ADD COLUMN {field} FLOAT'))
+
+
+def add_a_la_carte(engine):
+    from app.models import ALaCarteItem, ALaCarteOrder, ALaCarteOrderLine
+    with migration_transaction(engine) as connection:
+        for model in (ALaCarteItem, ALaCarteOrder, ALaCarteOrderLine):
+            model.__table__.create(connection, checkfirst=True)
+        columns = {c['name'] for c in inspect(connection).get_columns('issued_bills')}
+        if 'extra_lines' not in columns:
+            connection.execute(text("ALTER TABLE issued_bills ADD COLUMN extra_lines JSON NOT NULL DEFAULT '[]'"))

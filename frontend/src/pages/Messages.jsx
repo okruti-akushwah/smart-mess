@@ -79,7 +79,8 @@ function Conversation({ conversation, owner }) {
   }, [customerId]);
 
   useEffect(() => {
-    if (autoScroll.current) bottom.current?.scrollIntoView({ block: 'nearest' });
+    // Scroll the conversation only; scrollIntoView also moves enclosing panels/pages.
+    if (autoScroll.current && viewport.current) viewport.current.scrollTop = viewport.current.scrollHeight;
     function readVisible() {
       if (document.visibilityState !== 'visible' || !autoScroll.current || !messages.length) return;
       const id = messages.at(-1).id;
@@ -125,6 +126,6 @@ function Conversation({ conversation, owner }) {
       {loading ? <p role="status">{translate('Loading messages…')}</p> : !messages.length && <div className="messenger-empty"><h3>{translate('Start a conversation')}</h3><p>{translate(owner ? 'Send a message to this member.' : 'Send your owner a question about meals, delivery or your plan.')}</p></div>}
       {messages.map(message => <article className={`chat-bubble ${message.from_owner === owner ? 'chat-mine' : ''}`} key={message.id}><span className="sr-only">{translate(message.from_owner === owner ? 'You' : owner ? 'Mess member' : 'Mess owner')}</span><p>{message.body}</p><time dateTime={message.created_at}>{new Date(message.created_at).toLocaleString(translate.locale, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</time></article>)}<div ref={bottom} />
     </div>
-    <form className="messenger-compose" onSubmit={send}><label className="sr-only" htmlFor="chat-message">{translate('Your message')}</label><textarea id="chat-message" value={draft} maxLength={2000} rows={2} disabled={busy} placeholder={translate('Type your message…')} onChange={event => { setDraft(event.target.value); key.current = crypto.randomUUID(); }} /><button className="btn btn-primary chat-send-button" disabled={busy || !draft.trim()} aria-label={translate(busy ? 'Sending…' : 'Send message')} title={translate(busy ? 'Sending…' : 'Send message')}><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4 20-7Z"/><path d="M22 2 11 13"/></svg></button><small className="chat-character-count">{draft.length}/2000</small>{sendError && <p className="alert error" role="alert">{translate(sendError)}</p>}</form>
+    <form className="messenger-compose" onSubmit={send}><label className="sr-only" htmlFor="chat-message">{translate('Your message')}</label><textarea id="chat-message" value={draft} maxLength={2000} rows={2} disabled={busy} placeholder={translate('Type your message…')} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && event.keyCode !== 229) { event.preventDefault(); if (!busy && draft.trim()) event.currentTarget.form.requestSubmit(); } }} onChange={event => { setDraft(event.target.value); key.current = crypto.randomUUID(); }} /><button className="btn btn-primary chat-send-button" disabled={busy || !draft.trim()} aria-label={translate(busy ? 'Sending…' : 'Send message')} title={translate(busy ? 'Sending…' : 'Send message')}><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4 20-7Z"/><path d="M22 2 11 13"/></svg></button><small className="chat-character-count">{draft.length}/2000</small>{sendError && <p className="alert error" role="alert">{translate(sendError)}</p>}</form>
   </div>;
 }

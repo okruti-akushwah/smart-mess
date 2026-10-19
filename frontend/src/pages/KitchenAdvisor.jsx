@@ -1,3 +1,4 @@
+import OwnerPage from "../components/OwnerPage";
 import { useEffect, useState } from 'react';
 import Navbar from '../components/Navbar';
 import { useTranslation } from '../i18n/useTranslation';
@@ -32,10 +33,10 @@ export default function KitchenAdvisor() {
     finally { setBusy(false); }
   }
   const evidence = Object.fromEntries((current?.reviews || []).map(review => [review.id, review]));
-  return <><Navbar title={translate('AI Kitchen Advisor')} /><main className="dashboard owner-dashboard kitchen-advisor">
-    <section className="advisor-hero"><div><p className="eyebrow">{translate('FROM FEEDBACK TO BETTER FOOD')}</p><h1>{translate('Your customers talk. AI helps you listen.')}</h1><p>{translate('Turn meal reviews into clear insights and practical next steps.')}</p></div></section>
+  return <><Navbar title={translate('AI Kitchen Advisor')} /><OwnerPage className="owner-dashboard kitchen-advisor">
+    <section className="advisor-hero"><div><p className="eyebrow">{translate('FROM FEEDBACK TO BETTER FOOD')}</p><h1>{translate('AI Kitchen Advisor')}</h1><p>{translate('Turn meal reviews into clear insights and practical next steps.')}</p></div></section>
     <section className="management-card">
-      <div className="section-heading"><div><h2>{translate('AI Kitchen Advisor')}</h2><p className="muted">{translate('Read the feedback. Find the patterns. Improve the next meal.')}</p></div><label className="advisor-period">{translate('Review period')}<select disabled={busy} value={days} onChange={event => { setDays(Number(event.target.value)); setOverview(null); setResult(null); setError(''); }}><option value={7}>{translate('Last 7 days')}</option><option value={30}>{translate('Last 30 days')}</option></select></label></div>
+      <div className="section-heading"><div><h2>{translate('Review summary')}</h2></div><label className="advisor-period">{translate('Review period')}<select disabled={busy} value={days} onChange={event => { setDays(Number(event.target.value)); setOverview(null); setResult(null); setError(''); }}><option value={7}>{translate('Last 7 days')}</option><option value={30}>{translate('Last 30 days')}</option></select></label></div>
       {overview && <div className="advisor-stats"><div><strong>{overview.review_count}</strong><span>{translate('Reviews in this analysis')}</span></div><div><strong>{overview.average_rating ?? '—'} <small>/ 5</small></strong><span>{translate('Average rating')}</span></div><div><strong>{overview.comment_count}</strong><span>{translate('Written comments')}</span></div></div>}
       <div className="advisor-analyze"><button className="btn btn-primary" disabled={busy || !overview?.comment_count} aria-busy={busy} onClick={analyze}>{busy ? translate('AI is reading the reviews…') : translate('✦ Analyze feedback')}</button></div>
       {error && <p className="alert error" role="alert">{translate(error)}</p>}
@@ -47,5 +48,5 @@ export default function KitchenAdvisor() {
       {overview?.reviews.length > 0 && <details className="advisor-review-list"><summary>{translate('Read the source reviews')} ({overview.review_count})</summary>{overview.reviews.map(review => <blockquote key={review.id}><span>{'★'.repeat(review.rating)} · {translate('Review')} {review.id.slice(1)}</span><p>{review.comment || translate('Rating only')}</p></blockquote>)}</details>}
       <p className="advisor-note">{translate('Uses up to 100 recent reviews. Suggestions support owner decisions; they do not change menus or contact customers.')}</p>
     </section>
-  </main></>;
+  </OwnerPage></>;
 }

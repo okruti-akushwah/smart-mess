@@ -41,6 +41,9 @@ def apply_date_pauses(db, meal):
         delivery = db.query(models.DeliveryUpdate).filter_by(user_id=pause.user_id, meal_id=meal.id).first()
         if delivery and delivery.status in ("out_for_delivery", "delivered"):
             continue
+        from app.a_la_carte import has_extras
+        if has_extras(db, pause.user_id, meal.id):
+            continue
         add_extension_day = not has_skipped_meal_for_date(db, pause.user_id, plan.id, meal.date)
         order = order or models.MealOrder(user_id=pause.user_id, meal_id=meal.id)
         order.status, order.extra_cost, order.extra_items = "skipped", 0, None

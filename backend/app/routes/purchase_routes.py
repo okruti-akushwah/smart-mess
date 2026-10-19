@@ -15,6 +15,7 @@ from app.routes.discovery_routes import customer
 from app.routes.workflow_routes import bill_output
 from app.routes.owner_meal_routes import require_owner
 from app.subscription_extensions import lock_customer
+from app.a_la_carte import booking_lines
 
 router = APIRouter(tags=["customer purchases"])
 
@@ -147,6 +148,7 @@ def activity(db: Session = Depends(get_db), user=Depends(customer)):
             "kind": "meal" if coverage and coverage.meal_id else "subscription",
             "status": "skipped" if order and order.status == "skipped" else delivery.status if delivery else "scheduled" if meal.date >= date.today() else "past meal",
             "extra_cost": float(order.extra_cost or 0) if order else 0,
+            "extra_lines": [line for line in booking_lines(db, coverage.id) if line['meal_id'] == meal.id] if coverage else [],
             "rating": review.rating if review else None, "can_review": meal.id in reviewable})
     purchases = [purchase_output(p, db) for p in plans if db.query(models.IssuedBill).filter_by(plan_id=p.id).first()]
     receipts = [{"id": r.id, "plan_id": r.plan_id, "amount": float(r.amount), "reference": r.reference,

@@ -1,3 +1,4 @@
+import OwnerPage from "../components/OwnerPage";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Navbar from "../components/Navbar";
@@ -49,12 +50,12 @@ export default function OwnerOnboarding() {
 
   return <>
     <Navbar title={translate("Owner setup guide")} />
-    <main className="dashboard owner-dashboard owner-onboarding">
+    <OwnerPage className="owner-dashboard owner-onboarding">
       <section className="owner-onboarding-hero">
         <div>
           <p className="eyebrow">{translate("A SIMPLE START FOR YOUR MESS")}</p>
           <h1>{translate("Let’s set up your kitchen.")}</h1>
-          <p>{translate("We’ll take this one question at a time. Your answers are saved in the same tools you already use to manage your mess.")}</p>
+          <p>{translate("Start with public contact details. Add your menu and plans when ready. Save changes inside each section.")}</p>
         </div>
         <Link className="btn btn-outline" to="/owner">{translate("Back to dashboard")}</Link>
       </section>
@@ -100,11 +101,11 @@ export default function OwnerOnboarding() {
             <button type="button" className="btn btn-outline" disabled={current === 0} onClick={() => {setCurrent((value) => value - 1);setCopied(false);setCopyError(false);}}>{translate("Back")}</button>
             {current < steps.length - 1
               ? <button type="button" className="btn btn-primary" onClick={() => {setCurrent((value) => value + 1);setCopied(false);setCopyError(false);}}>{translate("Next question")} <span aria-hidden="true">→</span></button>
-              : <Link className="btn btn-primary" to="/owner">{translate("Finish setup")} <span aria-hidden="true">✓</span></Link>}
+              : <Link className="btn btn-primary" to="/owner">{translate("Return to dashboard")} <span aria-hidden="true">✓</span></Link>}
           </div>
-          <p className="owner-onboarding-note">{translate("You can return to any step and change these details later.")}</p>
+          <p className="owner-onboarding-note">{translate("Moving between sections keeps your drafts. Save each form before leaving this page.")}</p>
         </div>
       </section>
-    </main>
+    </OwnerPage>
   </>;
 }

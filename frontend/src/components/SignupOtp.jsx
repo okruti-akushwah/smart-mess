@@ -1,3 +1,4 @@
+import Button from './ui/Button';
 import { useEffect, useRef, useState } from "react";
 import api, { errorMessage } from "../services/api";
 import { useTranslation } from "../i18n/useTranslation";
@@ -52,13 +53,13 @@ export default function SignupOtp({ phone, joinToken, role = "owner", onVerified
     <p className="muted">{translate("Verify once during signup. Later, log in with your phone and password.")}</p>
     {!inline && <p className="verification-phone">+91 {phone}</p>}
     {challenge && <p className={challenge.delivery === "console" ? "alert otp-test-notice" : "muted"} role="status">{translate(challenge.message)}</p>}
-    {error && <p className="alert error" role="alert">{translate(error)}</p>}
-    {!challenge ? <button type="button" className="btn btn-primary btn-full" disabled={busy || !/^[0-9]{10}$/.test(phone)} onClick={send}>{translate(busy ? "Please wait..." : "Send signup OTP")}</button> : <FormContainer className="otp-code-form" onSubmit={inline ? undefined : verify}>
+    {error && <p id="signup-otp-error" className="alert error" role="alert">{translate(error)}</p>}
+    {!challenge ? <Button type="button" className="btn-full" loading={busy} disabled={!/^[0-9]{10}$/.test(phone)} onClick={send}>{translate(busy ? "Please wait..." : "Send signup OTP")}</Button> : <FormContainer className="otp-code-form" onSubmit={inline ? undefined : verify}>
       <label htmlFor="signup-otp">{translate("6-digit OTP")}</label>
-      <input id="signup-otp" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" minLength={6} maxLength={6} value={code} onChange={event => setCode(event.target.value.replace(/[^0-9]/g, ""))} onKeyDown={event => {if (inline && event.key === "Enter") {event.preventDefault();if (!busy && code.length === 6) verify(event);}}} required disabled={busy} autoFocus />
-      <p className="muted">{translate("The code expires in 5 minutes.")}</p>
-      <button type={inline ? "button" : "submit"} onClick={inline ? verify : undefined} className="btn btn-primary btn-full" disabled={busy || code.length !== 6}>{translate(busy ? "Please wait..." : "Verify number")}</button>
+      <input aria-describedby={error ? "signup-otp-expiry signup-otp-error" : "signup-otp-expiry"} id="signup-otp" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" minLength={6} maxLength={6} value={code} onChange={event => setCode(event.target.value.replace(/[^0-9]/g, ""))} onKeyDown={event => {if (inline && event.key === "Enter") {event.preventDefault();if (!busy && code.length === 6) verify(event);}}} required disabled={busy} autoFocus />
+      <p id="signup-otp-expiry" className="muted">{translate("The code expires in 5 minutes.")}</p>
+      <Button type={inline ? "button" : "submit"} onClick={inline ? verify : undefined} className="btn-full" loading={busy} disabled={code.length !== 6}>{translate(busy ? "Please wait..." : "Verify number")}</Button>
     </FormContainer>}
-    <div className="otp-actions">{challenge && <button type="button" className="btn btn-outline" disabled={busy || remaining > 0} onClick={send}>{translate("Resend OTP")}{remaining > 0 ? ` (${remaining}s)` : ""}</button>}{onBack && <button type="button" className="btn btn-outline" disabled={busy} onClick={onBack}>{translate("Edit account details")}</button>}</div>
+    <div className="otp-actions">{challenge && <Button type="button" variant="outline" disabled={busy || remaining > 0} onClick={send}>{translate("Resend OTP")}{remaining > 0 ? ` (${remaining}s)` : ""}</Button>}{onBack && <Button type="button" variant="outline" disabled={busy} onClick={onBack}>{translate("Edit account details")}</Button>}</div>
   </section>;
 }

@@ -26,7 +26,8 @@ def customers(db: Session = Depends(get_db), owner=Depends(require_owner)):
             "membership_status": memberships.get(user.id, "approved"),
             "subscriptions": [{"id": p.id, "name": p.plan_type,
                 "status": "awaiting_payment" if p.status == "pending_payment" else "upcoming" if p.start_date > date.today() else "active",
-                "start_date": p.start_date, "end_date": p.end_date, "meal_types": p.meal_types}
+                "start_date": p.start_date, "end_date": p.end_date, "meal_types": p.meal_types,
+                "extension_days": p.skip_count or 0}
                 for p in plans if p.user_id == user.id]})
     return result
 

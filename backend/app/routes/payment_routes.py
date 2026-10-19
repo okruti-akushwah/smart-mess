@@ -41,6 +41,12 @@ def download_receipt(receipt_id: int, db: Session = Depends(get_db), user=Depend
         ("Meal date" if plan.meal_id else "Subscription dates", str(plan.start_date) if plan.meal_id else f"{plan.start_date} to {plan.end_date}"),
         ("Payment reference / note", receipt.reference or "Payment recorded by owner"),
     ]
+    snapshot = db.query(models.IssuedBill).filter(models.IssuedBill.plan_id == plan.id,
+        models.IssuedBill.created_at <= receipt.created_at).order_by(models.IssuedBill.id.desc()).first()
+    if snapshot and snapshot.extra_lines:
+        fields.append(('Booking bill', f'#{snapshot.id}'))
+        for line in snapshot.extra_lines:
+            fields.append(('A la carte', f"{line['name']} · {line['quantity']} × Rs {line['unit_price']:.2f} = Rs {line['total']:.2f}"))
     rows = "".join(f"<tr><th>{escape(label)}</th><td>{escape(str(value))}</td></tr>" for label, value in fields)
     html = f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Payment receipt SM-{receipt.id:06d}</title><style>
     *{{box-sizing:border-box}}body{{margin:0;background:#f6f7f3;color:#17221c;font:16px Arial,sans-serif;line-height:1.5}}main{{max-width:760px;margin:40px auto;padding:40px;background:white;border:1px solid #dce5d8;border-radius:20px}}h1{{margin:8px 0 24px}}.brand{{color:#176c46;font-weight:bold}}.paid{{display:inline-block;padding:6px 14px;border-radius:20px;background:#edf6ee;color:#176c46;font-weight:bold}}table{{width:100%;border-collapse:collapse;margin:24px 0}}th,td{{text-align:left;vertical-align:top;border-bottom:1px solid #e3e8e0;padding:14px 0;overflow-wrap:anywhere}}th{{width:38%;padding-right:20px;color:#65756c;font-weight:normal}}.total{{display:flex;justify-content:space-between;gap:20px;border-top:2px solid #176c46;padding:20px 0;font-size:24px;font-weight:bold}}.note{{color:#65756c;font-size:13px}}@media(max-width:600px){{main{{margin:12px;padding:24px}}}}@media print{{body{{background:white}}main{{margin:0;max-width:none;border:0;padding:20px}}.print-note{{display:none}}}}

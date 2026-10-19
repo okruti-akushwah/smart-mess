@@ -1,11 +1,8 @@
-.owner-payments-summary-row{display:flex;align-items:center;justify-content:space-between;gap:20px;margin:24px 0 18px}.owner-payments-summary-row>span{font-size:11px;font-weight:800;letter-spacing:.14em;color:#9c6135}.owner-earnings-card{display:grid;gap:6px;min-width:255px;padding:18px 22px;border:1px solid #d8e6d5;border-radius:18px;background:linear-gradient(135deg,#f0f7eb,#e4f0e2);box-shadow:0 12px 28px #2e63400d}.owner-earnings-card p{margin:0;color:#526b58;font-size:13px;font-weight:650}.owner-earnings-card strong{color:#176b43;font-size:clamp(26px,3vw,36px);line-height:1.1;font-variant-numeric:tabular-nums}.owner-earnings-card small{color:#77847a;font-size:11px}.owner-earnings-card.is-unavailable{border-color:#ead8ad;background:linear-gradient(135deg,#fff9e9,#fbf4df)}.owner-earnings-card.is-unavailable small{max-width:310px;color:#76613b;line-height:1.45}@media(max-width:560px){.owner-payments-summary-row{align-items:stretch;flex-direction:column}.owner-earnings-card{min-width:0}}
-
-.owner-payments-page .owner-payments-summary-row { display: flex; align-items: center; justify-content: space-between; gap: 28px; }
-.owner-payments-summary-row > div { flex: 1; min-width: 0; }
-.owner-payments-page .owner-earnings-card { flex: 0 0 280px; min-width: 0; box-sizing: border-box; }
-.owner-payments-page .owner-earnings-card p { color: #526b58; }
-.owner-payments-page > .management-card { margin-top: 24px; }
-@media (max-width: 760px) {
-  .owner-payments-page .owner-payments-summary-row { flex-direction: column; align-items: stretch; }
-  .owner-payments-page .owner-earnings-card { flex-basis: auto; width: 100%; }
-}
+.owner-page .owner-payments-summary-row { display:flex; align-items:center; justify-content:space-between; gap:24px; }
+.owner-payments-summary-row > div { flex:1; min-width:0; }
+.owner-page .owner-earnings-card { flex:0 1 300px; min-width:0; padding:20px; border:1px solid var(--color-border); border-radius:var(--radius-control); background:var(--color-secondary); box-shadow:none; }
+.owner-page .owner-earnings-card p { margin:0; font-size:16px; color:var(--color-text-muted); }
+.owner-page .owner-earnings-card strong { display:block; font-size:32px; line-height:1.4; color:var(--color-brand); font-variant-numeric:tabular-nums; margin:8px 0; }
+.owner-page .owner-earnings-card small { display:block; color:var(--color-text-muted); font-size:14px; line-height:1.6; }
+.owner-page .owner-earnings-card.is-unavailable { border-color:var(--color-warning); background:var(--color-warning-subtle); }
+@media(width < 768px) { .owner-page .owner-payments-summary-row { flex-direction:column; align-items:stretch; } .owner-page .owner-earnings-card { flex-basis:auto; } }

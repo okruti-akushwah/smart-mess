@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Date, ForeignKey, Numeric, Boolean, DateTime, UniqueConstraint, JSON, Index, text
+from sqlalchemy import Column, Integer, String, Date, ForeignKey, Numeric, Boolean, DateTime, UniqueConstraint, JSON, Index, text, Float
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.database import Base
@@ -200,6 +200,7 @@ class PaymentSettings(Base):
 
 class IssuedBill(Base):
     __tablename__ = "issued_bills"
+    extra_lines = Column(JSON, nullable=False, default=list, server_default='[]')
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -243,8 +244,49 @@ class JoinRequest(Base):
     status = Column(String, default="pending", nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+class ALaCarteItem(Base):
+    __tablename__ = 'a_la_carte_items'
+    id = Column(Integer, primary_key=True)
+    owner_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    name = Column(String(100), nullable=False)
+    name_hi = Column(String(100), nullable=False, default='')
+    description = Column(String(500), nullable=False, default='')
+    description_hi = Column(String(500), nullable=False, default='')
+    price = Column(Numeric(10, 2), nullable=False)
+    available = Column(Boolean, nullable=False, default=True)
+    meal_types = Column(JSON, nullable=False)
+
+
+class ALaCarteOrder(Base):
+    __tablename__ = 'a_la_carte_orders'
+    id = Column(Integer, primary_key=True)
+    owner_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    plan_id = Column(Integer, ForeignKey('meal_plans.id'), nullable=False, index=True)
+    meal_id = Column(Integer, ForeignKey('meals.id'), nullable=False, index=True)
+    purchase_key = Column(String(36), nullable=False, unique=True)
+    total = Column(Numeric(12, 2), nullable=False)
+    status = Column(String(20), nullable=False, default='confirmed')
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    lines = relationship('ALaCarteOrderLine', order_by='ALaCarteOrderLine.id')
+
+
+class ALaCarteOrderLine(Base):
+    __tablename__ = 'a_la_carte_order_lines'
+    id = Column(Integer, primary_key=True)
+    owner_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    order_id = Column(Integer, ForeignKey('a_la_carte_orders.id'), nullable=False, index=True)
+    item_id = Column(Integer, ForeignKey('a_la_carte_items.id'), nullable=False)
+    quantity = Column(Integer, nullable=False)
+    unit_price = Column(Numeric(10, 2), nullable=False)
+    name = Column(String(100), nullable=False)
+    name_hi = Column(String(100), nullable=False, default='')
+
+
 class MessProfile(Base):
     __tablename__ = "mess_profiles"
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
     owner_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
     owner_name = Column(String, default="")
     business_type = Column(String, default="")

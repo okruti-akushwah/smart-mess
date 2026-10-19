@@ -1,5 +1,5 @@
 from decimal import Decimal
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, model_validator, field_validator
 from typing import Literal
 from sqlalchemy.orm import Session
@@ -28,6 +28,16 @@ class TimingInput(BaseModel):
 
 
 class ProfileInput(BaseModel):
+    latitude: float | None = Field(default=None, ge=-90, le=90, allow_inf_nan=False)
+    longitude: float | None = Field(default=None, ge=-180, le=180, allow_inf_nan=False)
+
+    @model_validator(mode='after')
+    def coordinate_pair(self):
+        supplied = {'latitude', 'longitude'} & self.model_fields_set
+        if supplied and (len(supplied) != 2 or (self.latitude is None) != (self.longitude is None)):
+            raise ValueError('Provide both latitude and longitude, or clear both')
+        return self
+
     owner_name: str = Field(default='', max_length=100)
     business_type: str = Field(default='', max_length=100)
     tagline: str = Field(default='', max_length=150)
@@ -69,7 +79,8 @@ class ProfileInput(BaseModel):
 
 def output(owner, db):
     profile = db.get(models.MessProfile, owner.id)
-    data = {field: getattr(profile, field) or '' if profile else '' for field in ProfileInput.model_fields if field != 'timings'}
+    data = {field: getattr(profile, field) or '' if profile else '' for field in ProfileInput.model_fields if field not in ('timings', 'latitude', 'longitude')}
+    data.update({field: getattr(profile, field) if profile else None for field in ('latitude', 'longitude')})
     data['name'] = data['name'] or f'{owner.name}’s mess'
     data['owner_id'] = owner.id
     data['profile_saved'] = profile is not None
@@ -92,7 +103,7 @@ def save_profile(body: ProfileInput, db: Session = Depends(get_db), owner=Depend
         item = models.MessProfile(owner_id=owner.id)
         db.add(item)
     for field, value in body.model_dump(exclude={"timings"}).items():
-        if (field.endswith("_hi") or field in BUSINESS_FIELDS) and field not in body.model_fields_set:
+        if (field.endswith("_hi") or field in BUSINESS_FIELDS or field in ('latitude', 'longitude')) and field not in body.model_fields_set:
             continue
         setattr(item, field, value)
     if body.timings is not None:
@@ -122,11 +133,19 @@ def public_profile(token: str, db: Session = Depends(public_db)):
 
 
 @router.get('/public/messes')
-def mess_directory(db: Session = Depends(get_db)):
+def mess_directory(db: Session = Depends(get_db),
+                   latitude: float | None = Query(default=None, ge=-90, le=90, allow_inf_nan=False),
+                   longitude: float | None = Query(default=None, ge=-180, le=180, allow_inf_nan=False),
+                   radius_km: int | None = Query(default=None)):
+    if radius_km is not None and radius_km not in (4, 10):
+        raise HTTPException(422, 'Choose a 4 km or 10 km radius')
+    if (latitude is None) != (longitude is None) or (radius_km is not None and latitude is None):
+        raise HTTPException(422, 'Provide both coordinates to search by distance')
     def rows():
         return db.query(models.User.id, models.User.name, models.MessProfile.name.label('mess_name'),
             models.MessProfile.name_hi, models.MessProfile.city, models.MessProfile.area,
             models.MessProfile.food_type, models.MessProfile.service_type,
+            models.MessProfile.latitude, models.MessProfile.longitude,
             models.JoinInvite.token).outerjoin(
             models.MessProfile, models.MessProfile.owner_id == models.User.id).outerjoin(
             models.JoinInvite, models.JoinInvite.owner_id == models.User.id).filter(
@@ -143,10 +162,18 @@ def mess_directory(db: Session = Depends(get_db)):
         except IntegrityError:
             db.rollback()  # Another request may have created the same invitation.
         owners = rows()
-    return [{'name': row.mess_name or f'{row.name}’s mess', 'name_hi': row.name_hi or '',
+    from app.locations import distance_km
+    result = [{'name': row.mess_name or f'{row.name}’s mess', 'name_hi': row.name_hi or '',
              'join_token': row.token, 'city': row.city or '', 'area': row.area or '',
-             'food_type': row.food_type or '', 'service_type': row.service_type or ''}
+             'food_type': row.food_type or '', 'service_type': row.service_type or '',
+             'distance_km': distance_km(latitude, longitude, row.latitude, row.longitude)
+                 if latitude is not None and row.latitude is not None and row.longitude is not None else None}
             for row in owners if row.token]
+    if radius_km is not None:
+        result = [row for row in result if row['distance_km'] is not None and row['distance_km'] <= radius_km]
+    if latitude is not None:
+        result.sort(key=lambda row: row['distance_km'] if row['distance_km'] is not None else float('inf'))
+    return result
 
 
 class GuestPriceInput(BaseModel):

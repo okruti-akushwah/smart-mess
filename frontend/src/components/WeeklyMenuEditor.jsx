@@ -1,220 +1,130 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import api, { errorMessage } from "../services/api";
 import { useTranslation } from "../i18n/useTranslation";
+import MenuItemPicker from "./MenuItemPicker";
+import MenuPhotoEditor from "./MenuPhotoEditor";
 import "./weekly-menu.css";
-
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const MEALS = ["breakfast", "lunch", "dinner"];
-const CUSTOM_MENU = "__custom_menu__";
-const emptyItem = () => ({menu_description: "", cutoff_time: "", single_price: ""});
-const timeAnchor = (weekday, value) => {
+const emptyItem = () => ({menu_description: "", cutoff_time: "", single_price: "", image_url: null});
+function convertTime(day, value, toUTC = false) {
   if (!value) return "";
-  const [hour, minute] = value.split(":").map(Number);
-  const date = new Date(Date.UTC(2026, 0, 5 + weekday, hour, minute));
-  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-};
-const utcTime = (weekday, value) => {
-  if (!value) return null;
-  const [hour, minute] = value.split(":").map(Number);
-  const date = new Date(2026, 0, 5 + weekday, hour, minute);
-  return `${String(date.getUTCHours()).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")}`;
-};
-
-export default function WeeklyMenuEditor() {
+  const [h, m] = value.split(":").map(Number);
+  const date = toUTC ? new Date(2026, 0, 5 + day, h, m) : new Date(Date.UTC(2026, 0, 5 + day, h, m));
+  return `${String(toUTC ? date.getUTCHours() : date.getHours()).padStart(2, "0")}:${String(toUTC ? date.getUTCMinutes() : date.getMinutes()).padStart(2, "0")}`;
+}
+export default function WeeklyMenuEditor({oneTime, mode = "weekly", onModeChange}) {
   const translate = useTranslation();
+  const editorRef = useRef(null);
   const [items, setItems] = useState({});
-  const [menuChoices, setMenuChoices] = useState([]);
   const [weekday, setWeekday] = useState(0);
   const [mealType, setMealType] = useState("breakfast");
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [newDish, setNewDish] = useState("");
-  const [addingDish, setAddingDish] = useState(false);
-  const [dishError, setDishError] = useState("");
-
+  const [editingSlot, setEditingSlot] = useState(null);
+  const [beforeEdit, setBeforeEdit] = useState(null);
+  const [generating, setGenerating] = useState(false);
+  const [savedItems,setSavedItems] = useState(null);
   useEffect(() => {
     let active = true;
-    Promise.all([api.get("/owner/weekly-menu"), api.get("/owner/menu-items").catch(() => null)])
-      .then(([response, catalogResponse]) => {
-        if (!active) return;
-        const next = {};
-        response.data.forEach(item => {
-          next[`${item.weekday}-${item.meal_type}`] = {
-            menu_description: item.menu_description || "",
-            cutoff_time: timeAnchor(item.weekday, item.cutoff_time),
-            single_price: item.single_price ?? "",
-          };
-        });
-        setItems(next);
-        if (catalogResponse) {
-          setMenuChoices(Array.isArray(catalogResponse.data) ? catalogResponse.data : []);
-        }
-      }).catch(err => setError(err.response?.status === 404
-        ? "The connected backend does not have the weekly menu API yet. Restart the local backend or deploy the latest backend version, then reload this page."
-        : errorMessage(err, "Unable to load the weekly menu.")))
+    api.get("/owner/weekly-menu").then(({data}) => {
+      if (!active) return;
+      const loadedItems = Object.fromEntries(data.map(item => [`${item.weekday}-${item.meal_type}`, {
+        ...item, menu_description: item.menu_description || "", cutoff_time: convertTime(item.weekday, item.cutoff_time), single_price: item.single_price ?? ""
+      }]));
+      setItems(loadedItems);setSavedItems(loadedItems);
+    }).catch(err => {if (active) {setLoadFailed(true);setError(errorMessage(err, "Unable to load the weekly menu."));}})
       .finally(() => {if (active) setLoading(false);});
     return () => {active = false;};
   }, []);
-
   const currentKey = `${weekday}-${mealType}`;
-  const currentItem = items[currentKey] || emptyItem();
-  const allMenuChoices = useMemo(() => {
-    const unique = new Map();
-    [...menuChoices, ...Object.values(items).map(item => item.menu_description)]
-      .forEach(choice => {
-        const value = String(choice || "").trim();
-        if (value && !unique.has(value.toLocaleLowerCase())) unique.set(value.toLocaleLowerCase(), value);
-      });
-    return [...unique.values()].sort((a, b) => a.localeCompare(b));
-  }, [items, menuChoices]);
-  const selectedDishes = currentItem.menu_description.split(',').map(dish => dish.trim()).filter(Boolean);
-  const dishChoices = [...new Set(['Dal', 'Roti', 'Sabji', 'Rice', 'Salad', 'Raita',
-    ...allMenuChoices.flatMap(menu => menu.split(',').map(dish => dish.trim()).filter(Boolean))])]
-    .filter((dish, index, dishes) => dishes.findIndex(item => item.toLocaleLowerCase() === dish.toLocaleLowerCase()) === index);
-
+  const dated = !!oneTime && mode === "date";
+  const selectedItem = dated ? oneTime.form : items[currentKey] || emptyItem();
   const update = (field, value) => {
-    setItems(previous => ({
-      ...previous,
-      [currentKey]: {...(previous[currentKey] || emptyItem()), [field]: value}
-    }));
+    if (dated) return oneTime.onChange({target: {name: field, value}});
+    setItems(previous => ({...previous, [currentKey]: {...(previous[currentKey] || emptyItem()),
+      ...(field === "menu_description" ? {image_url: null} : {}), [field]: value}}));
   };
-  const toggleDish = dish => {
-    const exists = selectedDishes.some(item => item.toLocaleLowerCase() === dish.toLocaleLowerCase());
-    update('menu_description', (exists
-      ? selectedDishes.filter(item => item.toLocaleLowerCase() !== dish.toLocaleLowerCase())
-      : [...selectedDishes, dish]).join(', '));
-  };
-  async function addDish() {
-    const name = newDish.trim();
-    if (!name || addingDish) return;
-    setAddingDish(true);setDishError("");
-    try {
-      const {data} = await api.post("/owner/menu-items", {name});
-      setMenuChoices(previous => [...previous, data.name]);
-      setItems(previous => {
-        const item = previous[currentKey] || emptyItem();
-        const dishes = item.menu_description.split(',').map(dish => dish.trim()).filter(Boolean);
-        if (!dishes.some(dish => dish.toLocaleLowerCase() === data.name.toLocaleLowerCase())) dishes.push(data.name);
-        return {...previous, [currentKey]: {...item, menu_description: dishes.join(', ')}};
-      });
-      setNewDish("");
-    } catch (err) {setDishError(errorMessage(err, "Unable to add this dish."));}
-    finally {setAddingDish(false);}
-  }
-
+  const acceptImage = (menu, url) => setItems(previous => {
+    const item = previous[currentKey] || emptyItem();
+    return item.menu_description === menu ? {...previous, [currentKey]: {...item, image_url: url}} : previous;
+  });
   async function save(event) {
     event.preventDefault();
-    const missingCutoff = Object.entries(items).find(([, item]) => item.menu_description.trim() && !item.cutoff_time);
-    if (missingCutoff) {
-      const [key] = missingCutoff;
-      const [missingWeekday, missingMeal] = key.split("-");
-      setWeekday(Number(missingWeekday));
-      setMealType(missingMeal);
-      setError(`Add a cutoff time for ${DAYS[Number(missingWeekday)]} ${missingMeal} before saving.`);
-      setMessage("");
+    const missing = Object.entries(items).find(([, item]) => item.menu_description.trim() && !item.cutoff_time);
+    if (missing) {
+      const [day, meal] = missing[0].split("-");
+      setWeekday(Number(day));setMealType(meal);
+      setError(`Add a cutoff time for ${DAYS[Number(day)]} ${meal} before saving.`);
       return;
     }
     setSaving(true);setError("");setMessage("");
     try {
       const payload = Object.entries(items).flatMap(([key, item]) => {
-        const [weekdayIndex, meal_type] = key.split("-");
-        const menu_description = item.menu_description.trim();
-        if (!menu_description) return [];
-        return [{weekday: Number(weekdayIndex), meal_type, menu_description,
-          cutoff_time: utcTime(Number(weekdayIndex), item.cutoff_time),
-          single_price: item.single_price === "" ? null : Number(item.single_price),
-          is_complimentary: true, image_url: null}];
+        const [day, meal_type] = key.split("-");
+        if (!item.menu_description.trim()) return [];
+        return [{weekday: Number(day), meal_type, menu_description: item.menu_description.trim(),
+          cutoff_time: convertTime(Number(day), item.cutoff_time, true), single_price: item.single_price === "" ? null : Number(item.single_price),
+          is_complimentary: item.is_complimentary ?? true, image_url: item.image_url || null}];
       });
-      const response = await api.put("/owner/weekly-menu", {items: payload});
-      setMessage(response.data.message);
-      window.dispatchEvent(new Event("meals-updated"));
-    } catch (err) {
-      setError(errorMessage(err, "Unable to save the weekly menu."));
-    } finally {setSaving(false);}
+      const {data} = await api.put("/owner/weekly-menu", {items: payload});
+      setMessage(data.message);setSavedItems(items);setEditingSlot(null);setBeforeEdit(null);window.dispatchEvent(new Event("meals-updated"));
+    } catch (err) {setError(errorMessage(err, "Unable to save the weekly menu."));}
+    finally {setSaving(false);}
   }
-
-  const configuredCount = Object.values(items).filter(item => item.menu_description.trim()).length;
-
+  const count = Object.values(items).filter(item => item.menu_description.trim()).length;
   return <section className="weekly-menu-editor">
-    <header className="weekly-menu-heading">
-      <div><p className="eyebrow">{translate("YOUR REPEATABLE MENU")}</p>
-        <h2>{translate("Build your weekly menu")}</h2>
-        <p>{translate("Choose a day and meal to add or update. Upcoming dates follow this menu, and you can edit it whenever your menu changes.")}</p></div>
-      <span className="weekly-menu-stamp">{translate("7 DAYS · REPEATS")}</span>
-    </header>
-    {error && <div className="weekly-menu-error" role="alert"><span aria-hidden="true">!</span><div><strong>{translate("Weekly menu could not load")}</strong><p>{translate(error)}</p></div></div>}
-    {message && <p className="alert success" role="status">{translate(message)}</p>}
-    {loading ? <p role="status">{translate("Loading weekly menu…")}</p> : !error && <form onSubmit={save}>
-      <div className="weekly-menu-selector">
-        <div className="weekly-menu-selectors">
-          <label>{translate("Day")}
-            <select value={weekday} onChange={event => setWeekday(Number(event.target.value))}>
-              {DAYS.map((day, index) => <option value={index} key={day}>{translate(day)}</option>)}
-            </select>
-          </label>
-          <label>{translate("Meal")}
-            <select value={mealType} onChange={event => setMealType(event.target.value)}>
-              {MEALS.map(meal => <option value={meal} key={meal}>{translate(meal)}</option>)}
-            </select>
-          </label>
-          <label>{translate("Add saved dishes")}
-            <select value={CUSTOM_MENU} onChange={event => {
-              if (event.target.value === CUSTOM_MENU) return;
-              const added = event.target.value.split(',').map(dish => dish.trim()).filter(Boolean);
-              const combined = [...selectedDishes];
-              added.forEach(dish => { if (!combined.some(item => item.toLocaleLowerCase() === dish.toLocaleLowerCase())) combined.push(dish); });
-              update("menu_description", combined.join(', '));
-            }}>
-              <option value={CUSTOM_MENU}>{translate("Select to add to this meal")}</option>
-              {allMenuChoices.map(menu => <option value={menu} key={menu}>{translate(menu)}</option>)}
-            </select>
-          </label>
-        </div>
-        <p className="weekly-menu-selection-hint">{translate("Selected slot")}: <strong>{translate(DAYS[weekday])} · {translate(mealType)}</strong></p>
-      </div>
-
-      <div className="weekly-menu-details">
-        <fieldset className="weekly-dish-picker"><legend>{translate("Build a complete meal")}</legend>
-          <p>{translate("Select all the dishes you serve together. You can also type custom dishes below, separated by commas.")}</p>
-          <div className="weekly-dish-options">{dishChoices.map(dish => <label key={dish}>
-            <input type="checkbox" checked={selectedDishes.some(item => item.toLocaleLowerCase() === dish.toLocaleLowerCase())}
-              onChange={() => toggleDish(dish)} />{translate(dish)}
-          </label>)}</div>
-          <div className="weekly-new-dish">
-            <label htmlFor="weekly-new-dish">{translate("Add a new dish")}
-              <input id="weekly-new-dish" type="text" maxLength={100} value={newDish} disabled={addingDish}
-                placeholder={translate("For example: Aloo gobi")}
-                onChange={event => {setNewDish(event.target.value);setDishError("");}}
-                onKeyDown={event => {if (event.key === "Enter") {event.preventDefault();addDish();}}} />
-            </label>
-            <button type="button" className="btn btn-outline" disabled={addingDish || !newDish.trim()} onClick={addDish}>
-              {translate(addingDish ? "Adding…" : "Add dish")}
-            </button>
-          </div>
-          <p className="muted">{translate("Add one dish at a time. It is added to this meal and saved in your dish list. Save weekly menu to publish the meal.")}</p>
-          {dishError && <p className="alert error" role="alert">{translate(dishError)}</p>}
-        </fieldset>
-        <label>{translate("Menu and dishes")}
-          <textarea maxLength="500" rows="3" value={currentItem.menu_description}
-            onChange={event => update("menu_description", event.target.value)}
-            placeholder={translate("For example: Dal, rice, seasonal sabzi and roti")} />
-        </label>
+    <header className="weekly-menu-heading"><div><p className="eyebrow">{translate("YOUR MENU")}</p>
+      <h2>{translate(oneTime ? dated ? "One-time meal change" : "Weekly menu" : "Build your weekly menu")}</h2>
+      <p>{translate(oneTime ? dated ? "This changes only the selected date. Your weekly menu stays the same." : "Your weekly menu at a glance. Select a meal to edit it." : "Choose a day and meal to add or update. Upcoming dates follow this menu, and you can edit it whenever your menu changes.")}</p></div></header>
+    {oneTime && <div className="meal-editor-modes" role="group" aria-label={translate("Schedule type")}>
+      <button type="button" aria-pressed={!dated} disabled={saving || oneTime.saving || editingSlot !== null} onClick={() => onModeChange("weekly")}>{translate("Weekly repeat")}</button>
+      <button type="button" aria-pressed={dated} disabled={saving || oneTime.saving || editingSlot !== null} onClick={() => onModeChange("date")}>{translate("Add a one-time meal")}</button>
+    </div>}
+    {!dated && error && <p className="alert error" role="alert">{translate(error)}</p>}
+    {!dated && message && <p className="alert success" role="status">{translate(message)}</p>}
+    {!dated && loading && <p role="status">{translate("Loading weekly menu…")}</p>}
+    {oneTime && !dated && !loading && !loadFailed && <div className="weekly-overview-scroll" role="region" aria-label={translate("Weekly menu")} tabIndex={0}>
+      <table className="weekly-overview"><thead><tr><th scope="col">{translate("Day")}</th>{MEALS.map(meal => <th scope="col" key={meal}>{translate(meal)}</th>)}</tr></thead>
+        <tbody>{DAYS.map((day, index) => <tr key={day}><th scope="row">{translate(day)}</th>{MEALS.map(meal => {
+          const item = items[`${index}-${meal}`];
+          return <td key={meal}><p>{item?.menu_description || translate("Not set")}</p>
+            <button type="button" className="weekly-slot-edit" disabled={saving || editingSlot !== null} aria-label={`${translate("Edit")} ${translate(day)} ${translate(meal)}`}
+              onClick={() => {setBeforeEdit(items);setWeekday(index);setMealType(meal);setEditingSlot(`${index}-${meal}`);setError("");requestAnimationFrame(() => {editorRef.current?.scrollIntoView({behavior: "instant", block: "start"});editorRef.current?.querySelector("input:not([disabled])")?.focus({preventScroll:true});});}}>{translate(item?.menu_description ? "Change menu" : "Add meal")}</button>
+          </td>;
+        })}</tr>)}</tbody>
+      </table>
+    </div>}
+    {(dated || (!loading && (!oneTime || editingSlot !== null))) && <form ref={editorRef} className="weekly-inline-editor" onSubmit={dated ? oneTime.onSubmit : save}>
+      {oneTime && !dated && <div className="weekly-inline-heading"><h3>{translate(DAYS[weekday])} · {translate(mealType)}</h3>
+        <button type="button" className="btn btn-outline" disabled={saving} onClick={() => {setItems(beforeEdit);setEditingSlot(null);setError("");}}>{translate("Cancel")}</button></div>}
+      {(dated || !oneTime) && <div className="weekly-menu-selector"><div className="weekly-menu-selectors">
+        {dated ? <label>{translate("Date")}<input type="date" required value={oneTime.form.date} onChange={e => update("date", e.target.value)} /></label> :
+          <label>{translate("Day")}<select value={weekday} onChange={e => setWeekday(Number(e.target.value))}>{DAYS.map((day, index) => <option value={index} key={day}>{translate(day)}</option>)}</select></label>}
+        <label>{translate("Meal Type")}<select value={dated ? oneTime.form.meal_type : mealType} onChange={e => dated ? update("meal_type", e.target.value) : setMealType(e.target.value)}>{MEALS.map(meal => <option value={meal} key={meal}>{translate(meal)}</option>)}</select></label>
+      </div>{!dated && <p className="weekly-menu-selection-hint">{translate(dated ? "This changes only the selected date. Your weekly menu stays the same." : "Repeats every week. Save weekly menu to publish your changes.")}</p>}</div>}
+      <p role="status">{translate(dated ? "Save this date to publish your changes." : savedItems && JSON.stringify(items) !== JSON.stringify(savedItems) ? "Unsaved changes" : "Saved weekly menu")}</p><div className="weekly-menu-details">
+        <MenuItemPicker required={dated} value={selectedItem.menu_description} onChange={value => update("menu_description", value)} />
         <div className="weekly-meal-options">
-          <label>{translate("Cutoff")}
-            <input type="time" required={!!currentItem.menu_description.trim()} value={currentItem.cutoff_time}
-              onChange={event => update("cutoff_time", event.target.value)} />
-          </label>
-          <label>{translate("Single meal price (₹)")}
-            <input type="number" min="0.01" max="10000" step="0.01" value={currentItem.single_price}
-              onChange={event => update("single_price", event.target.value)} placeholder={translate("Optional")} />
-          </label>
+          <label>{translate("Cutoff")}<input type="time" required={dated || !!selectedItem.menu_description.trim()} value={selectedItem.cutoff_time} onChange={e => update("cutoff_time", e.target.value)} /></label>
+          <label>{translate("Single meal price (₹)")}<input type="number" min="0.01" max="10000" step="0.01" value={selectedItem.single_price} onChange={e => update("single_price", e.target.value)} placeholder={translate("Optional")} /></label>
+        </div>
+        <p className="muted">{translate("Leave blank to disable single-meal ordering. Members without a subscription can buy this meal at this price.")}</p>
+        <details className="weekly-photo-options"><summary>{translate("Menu photo (optional)")}</summary><MenuPhotoEditor key={dated ? `date-${oneTime.editingId ?? "new"}` : currentKey} menu={selectedItem.menu_description} imageUrl={selectedItem.image_url}
+          savedImageUrl={dated ? undefined : savedItems?.[currentKey]?.image_url || null} onImage={dated ? oneTime.onImage : acceptImage} onBusy={setGenerating} /></details>
+      </div>
+      <div className="weekly-menu-save-row"><p>{!dated && translate("{count} of 21 meal slots have a menu. Blank slots stay unpublished.").replace("{count}", count)}</p>
+        <div className="form-actions">
+          {dated && oneTime.editingId !== null && <button type="button" className="btn btn-outline" onClick={oneTime.onCancel}>{translate("Cancel Edit")}</button>}
+          <button type="submit" className="btn btn-primary" disabled={dated ? oneTime.saving : saving || loading || loadFailed}>
+            {translate((dated ? oneTime.saving : saving) ? "Saving…" : dated ? oneTime.editingId !== null ? generating ? "Update menu without photo" : "Update Meal" : generating ? "Save menu without photo" : "Create Meal" : "Save weekly menu")}
+          </button>
         </div>
       </div>
-
-      <div className="weekly-menu-save-row"><p>{translate("{count} of 21 meal slots have a menu. Blank slots stay unpublished.").replace("{count}", configuredCount)}</p>
-        <button type="submit" className="btn btn-primary" disabled={saving}>{translate(saving ? "Saving…" : "Save weekly menu")}</button></div>
+      {dated && <div aria-live="polite">{oneTime.error && <p className="alert error">{translate(oneTime.error)}</p>}{oneTime.message && <p className="alert success">{translate(oneTime.message)}</p>}</div>}
     </form>}
   </section>;
 }

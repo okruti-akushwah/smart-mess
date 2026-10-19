@@ -1,7 +1,5 @@
 """Add one independent demonstration mess to the explicitly configured hosted database. Existing data is preserved."""
 import os
-import shutil
-import sqlite3
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
@@ -26,10 +24,8 @@ with SessionLocal() as db:
         raise SystemExit('Live demo accounts already exist or phone numbers are in use. No changes made.')
 
 today = datetime.now(timezone(timedelta(hours=5, minutes=30))).date()
-photos = ROOT / 'backend' / 'generated_menu_images'
-photos.mkdir(exist_ok=True)
-for dish in ['poha', 'paneer', 'dal', 'sabzi']:
-    shutil.copyfile(ROOT / 'frontend' / 'src' / 'assets' / f'menu-{dish}.webp', photos / f'live-demo-{dish}.webp')
+# Use the frontend's bundled menu illustrations. Uploading files on the machine
+# running this script would not make them available on the hosted API.
 
 with SessionLocal() as db:
     def add(cls, **values):
@@ -43,11 +39,15 @@ with SessionLocal() as db:
     if not db.get(m.MessInstallation, 1):
         add(m.MessInstallation, id=1, owner_id=oid)
     add(m.JoinInvite, owner_id=oid, token=uuid4().hex)
-    add(m.MessProfile, owner_id=oid, name='Annapurna Homestyle Kitchen',
+    add(m.MessProfile, owner_id=oid, name='Annapurna Homestyle Kitchen (Demo)',
+        owner_name='Rajesh Kulkarni', business_type='Home-style tiffin',
+        tagline='A little taste of home, every day.', city='Pune', area='Shivajinagar',
+        food_type='Vegetarian', service_type='Dine-in and delivery',
+        operating_days='Monday to Sunday', opening_time='07:30', closing_time='21:00', business_status='Active',
         name_hi='अन्नपूर्णा होमस्टाइल किचन', address='24 College Road, near City Library, Pune',
         contact='Kitchen counter · 7:30 AM–9:00 PM',
         hours='Breakfast 7:30–9:30 · Lunch 12:00–14:30 · Dinner 19:00–21:00',
-        about='Fresh vegetarian meals for students and working professionals, cooked daily with seasonal ingredients.',
+        about='Fresh vegetarian meals for students and working professionals, cooked daily with seasonal ingredients. Presentation demo: this mess, its members, reviews and payment records are fictional.',
         preparation='Vegetables prepared each morning. Dal cooked in small batches, rotis made fresh and meals packed before delivery.')
     for kind, start, end in [('breakfast','07:30','09:30'),('lunch','12:00','14:30'),('dinner','19:00','21:00')]:
         add(m.MealTiming, owner_id=oid, meal_type=kind, from_time=start, to_time=end)
@@ -73,7 +73,7 @@ with SessionLocal() as db:
             menu, photo=menus[kind][offset%3]
             cutoff=datetime.combine(day,datetime.min.time()).replace(hour=hour)-timedelta(hours=5,minutes=30)
             meals[offset,kind]=add(m.Meal, owner_id=oid, date=day, meal_type=kind,
-                menu_description=menu, image_url=f'/menu-images/live-demo-{photo}.webp',
+                menu_description=menu, image_url=None,
                 cutoff_time=cutoff, single_price=price, is_complimentary=False)
     names=['Aarav Sharma','Priya Mehta','Rohan Desai','Sneha Patil','Kabir Shah','Ananya Rao',
            'Ishaan Joshi','Meera Nair','Dev Kulkarni','Nisha Singh','Arjun Verma','Tanvi Gupta','Aditya Menon']
@@ -111,13 +111,13 @@ with SessionLocal() as db:
         add(m.DeliveryUpdate, owner_id=oid, user_id=user.id, meal_id=meals[-1,'lunch'].id, status='delivered')
         if i<6:
             add(m.Feedback, owner_id=oid, user_id=user.id, meal_id=meals[-1,'lunch'].id,
-                rating=4 if i==2 else 5, comment=[
+                rating=[5, 4, 2, 3, 5, 3][i], comment=[
                 'Soft rotis and delicious dal. The portions are perfect.',
-                'Loved the paneer today. Delivery arrived on time.',
-                'Fresh food; a little less oil would be great.',
-                'Feels like a home cooked lunch after a busy morning.',
-                'The rotating menu keeps the week interesting.',
-                'Good quality and convenient delivery to campus.'][i])
+                'Loved the dal and salad today. A little less oil in the sabzi would be great.',
+                'The rice was hard and needed a few more minutes of cooking. The dal tasted good.',
+                'Lunch arrived about twenty minutes late. Please improve delivery timing.',
+                'Fresh rotis and tasty dal. Feels like a home cooked lunch after classes.',
+                'The rice was undercooked, and delivery reached campus later than expected.'][i])
         if i==2:
             add(m.PaymentSubmission, owner_id=oid, user_id=user.id, bill_id=bill.id,
                 amount=1500, method='upi', reference='DEMO-PAYMENT-AWAITING-REVIEW', status='pending')

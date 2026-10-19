@@ -10,3 +10,36 @@
 .weekly-new-dish label { flex: 1; }
 .weekly-new-dish input { width: 100%; box-sizing: border-box; border: 1px solid #e1dfd5; border-radius: 11px; padding: 12px; background: white; color: #253a2d; font: inherit; }
 @media (max-width: 560px) { .weekly-new-dish { align-items: stretch; flex-direction: column; } }
+
+.combined-meal-editor{scroll-margin-top:100px;margin-top:24px}
+.meal-editor-modes{display:flex;gap:8px;padding:6px;background:#eaf0e7;border-radius:16px;margin-bottom:22px;width:fit-content;max-width:100%}
+.meal-editor-modes button{border:0;background:transparent;color:#52665a;padding:12px 22px;border-radius:12px;font:inherit;font-weight:700;cursor:pointer}
+.meal-editor-modes button[aria-pressed="true"]{background:#34764b;color:white;box-shadow:0 3px 10px #244d2420}
+.meal-editor-modes button:focus-visible{outline:2px solid #34764b;outline-offset:3px}
+.combined-meal-editor .weekly-menu-selectors{grid-template-columns:repeat(2,minmax(0,1fr))}
+.weekly-menu-selectors input{width:100%;box-sizing:border-box;min-height:48px;padding:12px;border:1px solid #e1dfd5;border-radius:11px;font:inherit;background:white;color:#253a2d}
+.weekly-menu-details .menu-photo-editor{margin-top:24px}
+@media(max-width:560px){.combined-meal-editor .weekly-menu-selectors{grid-template-columns:1fr}.meal-editor-modes{width:100%;box-sizing:border-box}.meal-editor-modes button{flex:1;padding:12px 10px}}
+
+.weekly-overview-scroll{overflow-x:auto;background:#fff;border:1px solid #e0e7dc;border-radius:16px}
+.weekly-overview{width:100%;border-collapse:collapse;table-layout:fixed;min-width:540px}
+.weekly-overview th,.weekly-overview td{padding:14px 16px;text-align:left;border-bottom:1px solid #e8ede4;vertical-align:top}
+.weekly-overview thead th{background:#edf3e9;color:#346448;text-transform:capitalize;font-size:13px}
+.weekly-overview th:first-child{width:105px}
+.weekly-overview tbody th{font-size:13px;color:#536459}
+.weekly-overview td p{font-size:13px;line-height:1.5;margin:0 0 5px;color:#334b3c;overflow-wrap:anywhere}
+.weekly-overview tr:last-child>*{border-bottom:0}
+.weekly-slot-edit{min-height:44px;border:0;background:none;color:#34764b;padding:3px 0;font:inherit;font-size:12px;font-weight:750;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.weekly-inline-editor{margin-top:20px;scroll-margin-top:24px}.weekly-inline-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.weekly-inline-heading h3{text-transform:capitalize}
+.weekly-photo-options{margin-top:18px}.weekly-photo-options summary{cursor:pointer;color:#34764b;font-weight:650;font-size:14px}
+
+.owner-weekly-menu-page .combined-meal-editor{margin-top:0}
+.owner-weekly-menu-page .weekly-menu-editor{background:#fff;border-color:#dce5d7;box-shadow:0 5px 22px #29452b08}
+.meal-schedule-panel{margin-top:24px;border:1px solid #dce5d7;border-radius:20px;background:#fff;overflow:hidden}
+.meal-schedule-panel>summary{padding:22px 26px;cursor:pointer;color:#294b35;font-weight:750}
+.meal-schedule-panel>summary small{display:block;font-size:13px;font-weight:400;color:#748173;margin:7px 0 0 18px}
+.meal-schedule-panel .management-card{border:0;box-shadow:none;margin:0;padding-top:8px}
+.schedule-date-filter{display:flex;align-items:center;gap:14px;color:#596b5d;font-size:14px;margin-bottom:20px}
+.schedule-date-filter select{padding:10px 16px;border:1px solid #dce5d7;border-radius:10px;background:#f7faf4;color:#294b35;font:inherit}
+.meal-schedule-panel .meal-thumbnail{width:64px;height:64px;border-radius:12px}.meal-schedule-panel .management-row{padding:16px;gap:18px}.meal-schedule-panel .management-info h3{font-size:16px}
+.weekly-slot-edit:disabled{opacity:.4;cursor:default}

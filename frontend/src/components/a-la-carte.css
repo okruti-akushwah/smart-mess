@@ -1,0 +1,44 @@
+.extras-item { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px 0; border-bottom:1px solid var(--color-border); }
+.extras-item > div { min-width:0; overflow-wrap:anywhere; }
+.extras-item p { margin:4px 0; }
+.extras-item label { display:grid; gap:4px; flex:0 0 90px; }
+.extras-item input[type="number"] { width:100%; min-height:44px; }
+.extras-item-list { margin-bottom:20px; }
+.extras-orders > h2 { margin:0 0 20px; }
+.extras-order-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr)); align-items:start; gap:16px; }
+.extras-order { min-width:0; padding:20px; border:1px solid var(--color-border); border-radius:16px; background:var(--color-surface); overflow-wrap:anywhere; }
+.extras-order .extras-order-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.extras-order-heading > div { min-width:0; }
+.extras-order .extras-order-heading h3 { margin:0; font-size:18px; line-height:1.5; }
+.extras-order-id { color:var(--color-text-muted); font-size:14px; font-weight:500; white-space:nowrap; }
+.extras-order .extras-order-meal { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:6px 0 0; font-size:14px; color:var(--color-text-muted); }
+.extras-order-meal svg, .extras-order-status svg, .extras-order-address > svg { flex-shrink:0; }
+.extras-order-status { display:inline-flex; align-items:center; gap:4px; padding:5px 9px; border-radius:999px; background:var(--color-secondary); color:var(--color-success); font-size:13px; font-weight:600; }
+.extras-order .extra-lines-compact { margin:20px 0 0; padding-top:16px; border-top:1px solid var(--color-border); }
+.extra-lines-compact > strong { font-size:14px; color:var(--color-text-muted); font-weight:500; }
+.extras-order .extra-lines-compact ul { list-style:none; margin:8px 0 0; padding:0; }
+.extra-lines-compact li { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; padding:8px 0; }
+.extra-lines-compact li > div { min-width:0; }
+.extras-line-name, .extras-line-quantity { display:block; }
+.extras-line-name { font-weight:600; }
+.extras-line-quantity { margin-top:2px; font-size:14px; color:var(--color-text-muted); font-variant-numeric:tabular-nums; }
+.extra-lines-compact li > strong { flex-shrink:0; font-size:16px; font-variant-numeric:tabular-nums; }
+.extras-order-total { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px 16px; margin-top:8px; padding:12px; border-radius:10px; background:var(--color-secondary); font-size:14px; }
+.extras-order-total strong { font-size:20px; font-variant-numeric:tabular-nums; }
+.extras-order-delivery { margin-top:16px; }
+.extras-order-address { display:flex; align-items:flex-start; gap:8px; }
+.extras-order-address > svg { margin-top:3px; color:var(--color-text-muted); }
+.extras-order-address strong { font-size:13px; color:var(--color-text-muted); font-weight:500; }
+.extras-order .extras-order-address p { margin:3px 0 0; font-size:14px; line-height:1.6; }
+.extras-order .extras-order-instructions { margin:8px 0 0 26px; padding-inline-start:10px; border-inline-start:2px solid var(--color-border); color:var(--color-text-muted); font-size:14px; line-height:1.6; }
+.extras-order-phone { display:inline-flex; align-items:center; min-height:44px; margin:8px 0 0 26px; font-size:14px; text-decoration:underline; text-underline-offset:3px; }
+.extras-order-bill { display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:44px; margin-top:12px; font-size:14px; text-decoration:underline; text-underline-offset:3px; }
+@media (max-width:480px) {
+  .extras-order { padding:16px; }
+  .extras-order .extras-order-heading { flex-direction:column; gap:8px; }
+}
+.extra-lines { margin:12px 0; overflow-wrap:anywhere; }
+.extra-lines ul { margin:8px 0; padding-inline-start:20px; }
+.kitchen-location { min-width:0; padding:16px; border:1px solid var(--color-border); border-radius:var(--radius-control,10px); }
+.kitchen-location .form-field { min-width:0; flex:1 1 160px; }
+@media (max-width:480px) { .extras-item { gap:12px; } }

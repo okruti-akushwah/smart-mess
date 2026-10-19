@@ -30,3 +30,13 @@ def change_extension(db, plan, delta):
         item.start_date = max(item.original_start_date, previous_end + timedelta(days=1)) if previous_end else item.original_start_date
         item.end_date = item.start_date + timedelta(days=duration + (item.skip_count or 0))
         previous_end = item.end_date
+    # Later subscriptions can move when an earlier one earns days. Do not move
+    # a confirmed extra order outside the booking the customer bought it for.
+    from fastapi import HTTPException
+    from app.meal_coverage import covers
+    bookings = {item.id:item for item in plans}
+    for order in db.query(models.ALaCarteOrder).filter(
+            models.ALaCarteOrder.plan_id.in_(list(bookings)),
+            models.ALaCarteOrder.status == 'confirmed').all():
+        if not covers(bookings[order.plan_id], db.get(models.Meal, order.meal_id)):
+            raise HTTPException(409, 'This change would move a booking with confirmed extras. Contact your owner.')

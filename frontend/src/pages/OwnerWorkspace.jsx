@@ -1,3 +1,4 @@
+import OwnerPage from "../components/OwnerPage";
 import Navbar from "../components/Navbar";
 import JoinManager from "../components/JoinManager";
 import OfferManager from "../components/OfferManager";
@@ -18,12 +19,12 @@ const sections = {
 export default function OwnerWorkspace({ section }) {
   const translate = useTranslation();
   const [title, description] = sections[section];
-  return <><Navbar title={translate(title)} /><main className={`dashboard owner-dashboard owner-workspace-${section}`}>
-    <section className="welcome owner-welcome"><div><p className="eyebrow">{translate("YOUR MESS WORKSPACE")}</p><h1>{translate(title)}</h1><p>{translate(description)}</p></div></section>
+  return <><Navbar title={translate(title)} /><OwnerPage className={`owner-dashboard owner-workspace-${section}`}>
+    <section className="workspace-heading"><div><p className="eyebrow">{translate("YOUR MESS WORKSPACE")}</p><h1>{translate(title)}</h1><p>{translate(description)}</p></div></section>
     {section === "requests" && <><JoinManager /><section id="payment-confirmations" style={{ scrollMarginTop: 180 }}><BillWorkflow owner view="payments" pendingOnly /></section></>}
-    {section === "plans" && <><OfferManager /><SubscriptionManager /></>}
+    {section === "plans" && <><nav className="workspace-section-links" aria-label={translate("Plan workspace sections")}><a href="#subscription-plans">{translate("Publish your plans")}</a><a href="#member-subscriptions">{translate("Set up a meal plan")}</a></nav><OfferManager /><SubscriptionManager /></>}
     {section === "customers" && <CustomerDirectory />}
     {section === "bills" && <BillWorkflow owner view="bills" />}
     {section === "settings" && <MessProfileEditor />}
-  </main></>;
+  </OwnerPage></>;
 }

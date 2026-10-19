@@ -118,3 +118,6 @@ from app.routes import kitchen_advisor
 app.include_router(kitchen_advisor.router)
 from app.routes import chat_routes
 app.include_router(chat_routes.router)
+
+from app.routes import a_la_carte_routes
+app.include_router(a_la_carte_routes.router)

@@ -1,3 +1,5 @@
+import BillBreakdown from "../components/BillBreakdown";
+import CustomerPage from "../components/CustomerPage";
 import { pendingBalance } from "../services/billing";
 import "../components/customerJourney.css";
 import { useTranslation } from "../i18n/useTranslation";
@@ -19,9 +21,6 @@ function BillHistory() {
 
   const [amountDue, setAmountDue] = useState(null);
 
-  const [history, setHistory] =
-  useState([]);
-
   const [loading, setLoading] =
   useState(true);
 
@@ -33,12 +32,10 @@ function BillHistory() {
       setError("");
 
       try {
-        const [current, previous, issued] = await Promise.allSettled([api.get("/bills/current"), api.get("/bills/history"), api.get("/bills/issued")]);
+        const [current, issued] = await Promise.allSettled([api.get("/bills/current"), api.get("/bills/issued")]);
         if (current.status === "fulfilled") setCurrentBill(current.value.data);else
         if (current.reason.response?.status === 404) setCurrentBill(null);else
         throw current.reason;
-        if (previous.status === "fulfilled") setHistory(previous.value.data);else
-        throw previous.reason;
         if (issued.status === "rejected") throw issued.reason;
         setAmountDue(pendingBalance(issued.value.data, current.status === "fulfilled" ? current.value.data : null));
       } catch (err) {
@@ -66,11 +63,11 @@ function BillHistory() {
       <>
         <Navbar title={translate("Bills")} />
 
-        <main className="dashboard">
-          <div className="loading-card">{translate(" Loading bills... ")}
+        <CustomerPage>
+          <div className="loading-card" role="status">{translate(" Loading bills... ")}
 
           </div>
-        </main>
+        </CustomerPage>
       </>);
 
   }
@@ -79,12 +76,12 @@ function BillHistory() {
     <>
       <Navbar title={translate("Bills")} />
 
-      <main className="dashboard">
+      <CustomerPage>
         <section className="welcome bills-heading"><div><p className="eyebrow">{translate("TRANSPARENT BILLING")}</p><h1>{translate("Your Bills")}</h1><p>{translate("View your bills, payment confirmations and receipts.")}</p></div><div className="bills-pending-total" role="status" aria-live="polite"><span>{translate("Pending to pay owner")}</span><strong>{amountDue === null ? translate("Unavailable") : `₹${amountDue.toFixed(2)}`}</strong>{amountDue === 0 && <small>{translate("No payment pending")}</small>}</div></section>
         <BillWorkflow onUpdate={loadBills} payOnCheckout /><PaymentHistory />
 
         {error &&
-        <div className="alert error">
+        <div className="alert error" role="alert">
             {translate(error)}
           </div>
         }
@@ -106,119 +103,14 @@ function BillHistory() {
           </div> :
 
           <div className="bill-summary"><p>{currentBill.extension_days || 0}{translate(" extra subscription days · ")}{currentBill.skipped_meals || 0}{translate(" skipped meals · Subscription ends ")}{currentBill.end_date}</p>
-              <BillStat
-              label="Base Plan"
-              value={
-              currentBill.base_amount
-              } />
-            
-
-              {Number(currentBill.deductions) > 0 && <BillStat
-              label="Historical Skip Deductions"
-              value={
-              currentBill.deductions
-              }
-              prefix="-" />}
-            
-
-              <BillStat
-              label="Guest"
-              value={
-              currentBill.extras_total
-              }
-              prefix="+" />
-            
-
-              <div className="bill-summary-total">
-                <span>{translate(" Current Total ")}
-
-              </span>
-
-                <strong>
-                  ₹
-                  {translate(Number(
-                  currentBill.final_amount ||
-                  0
-                ).toFixed(2))}
-                </strong>
-              </div>
+              <BillBreakdown bill={currentBill} />
             </div>
           }
         </section>
 
-        <section>
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">{translate(" PREVIOUS MONTHS ")}
 
-              </p>
-
-              <h2>{translate("Bill History")}</h2>
-            </div>
-          </div>
-
-          {history.length === 0 ?
-          <div className="empty-card">{translate(" Previous finalized bills will appear here. ")}
-
-
-          </div> :
-
-          <div className="history-list">
-              {history.map((bill) =>
-            <article
-              className="history-row"
-              key={bill.id}>
-              
-                  <div>
-                    <span className="meal-type">{translate(" BILL ")}
-
-                </span>
-
-                    <h3>
-                      {translate(bill.month ||
-                  `Bill #${bill.id}`)}
-                    </h3>
-                  </div>
-
-                  <div className="history-cost">
-                    <span>{translate(" Final amount ")}
-
-                </span>
-
-                    <strong>
-                      ₹
-                      {translate(Number(
-                    bill.final_amount ??
-                    bill.amount ??
-                    0
-                  ).toFixed(2))}
-                    </strong>
-                  </div>
-                </article>
-            )}
-            </div>
-          }
-        </section>
-      </main>
+      </CustomerPage>
     </>);
-
-}
-
-function BillStat({
-  label,
-  value,
-  prefix = ""
-}) {
-  const translate = useTranslation();
-  return (
-    <div className="bill-stat">
-      <span>{translate(label)}</span>
-
-      <strong>
-        {translate(prefix)}₹
-        {translate(Number(value || 0).toFixed(2))}
-      </strong>
-    </div>);
 
 }
 

@@ -213,6 +213,12 @@ def pause_result(body, db, user, apply=False):
     saved = {p.date: p for p in db.query(models.MealDatePause).filter(
         models.MealDatePause.user_id == user.id, models.MealDatePause.date >= body.start_date,
         models.MealDatePause.date <= body.end_date).all()}
+    commitment = db.query(models.ALaCarteOrder.id).join(models.Meal,
+        models.Meal.id == models.ALaCarteOrder.meal_id).filter(
+        models.ALaCarteOrder.user_id == user.id, models.ALaCarteOrder.status == 'confirmed',
+        models.Meal.date.in_(list(covered_dates))).first()
+    if commitment:
+        raise HTTPException(409, 'Extras are already ordered in these dates. Contact your owner before pausing.')
     new_dates = [day for day in covered_dates if day not in saved or not saved[day].active]
     if apply:
         for day in new_dates:

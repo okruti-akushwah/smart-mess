@@ -21,6 +21,7 @@ router = APIRouter(prefix="/bills", tags=["billing"])
 def get_current_bill(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
+    plan_id: int | None = None,
 ):
     """
     Calculates the logged-in customer's live bill.
@@ -38,17 +39,14 @@ def get_current_bill(
     # 1. Find user's active meal plan
     # -----------------------------------------------------
 
-    meal_plan = (
-        db.query(models.MealPlan)
-        .filter(
-            models.MealPlan.user_id == current_user.id,
-            models.MealPlan.status == "active",
-            models.MealPlan.meal_id.is_(None),
-            models.MealPlan.start_date <= today,
-            models.MealPlan.end_date >= today,
-        )
-        .first()
-    )
+    query = db.query(models.MealPlan).filter(models.MealPlan.user_id == current_user.id,
+        models.MealPlan.status == "active")
+    if plan_id is not None:
+        query = query.filter(models.MealPlan.id == plan_id)
+    else:
+        query = query.filter(models.MealPlan.meal_id.is_(None),
+            models.MealPlan.start_date <= today, models.MealPlan.end_date >= today)
+    meal_plan = query.first()
 
     if not meal_plan:
         raise HTTPException(
@@ -114,6 +112,9 @@ def get_current_bill(
     # 7. Calculate final amount
     # -----------------------------------------------------
 
+    from app.a_la_carte import booking_lines
+    extra_lines = booking_lines(db, meal_plan.id)
+    extras_total += sum((Decimal(str(line['total'])) for line in extra_lines), Decimal('0'))
     base_amount = Decimal(str(meal_plan.price or 0))
 
     final_amount = (
@@ -152,6 +153,7 @@ def get_current_bill(
         "deductions": float(deductions),
 
         "extras_total": float(extras_total),
+        "extra_lines": extra_lines,
 
         "final_amount": float(final_amount),
 

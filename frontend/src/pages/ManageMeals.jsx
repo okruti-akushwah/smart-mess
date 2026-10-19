@@ -1,9 +1,9 @@
+import ALaCarteManager from "../components/ALaCarteManager";
+import OwnerPage from "../components/OwnerPage";
 import { useTranslation } from "../i18n/useTranslation";
-import MenuItemPicker from "../components/MenuItemPicker";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MenuImage from "../components/MenuImage";
-import MenuPhotoEditor from "../components/MenuPhotoEditor";
 import Navbar from "../components/Navbar";
 import api, { errorMessage } from "../services/api";
 import WeeklyMenuEditor from "../components/WeeklyMenuEditor";
@@ -13,13 +13,14 @@ function ManageMeals() {
   const navigate = useNavigate();
   const dateChangesRef = useRef(null);
 
+  const [scheduleDate, setScheduleDate] = useState("");
   const [meals, setMeals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [editingId, setEditingId] = useState(null);
-  const [generating, setGenerating] = useState(false);
+  const [editorMode, setEditorMode] = useState("weekly");
   const [deleteId, setDeleteId] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
@@ -162,6 +163,7 @@ function ManageMeals() {
     setError("");
     setMessage("");
     setEditingId(meal.id);
+    setEditorMode("date");
 
     let cutoff = "";
 
@@ -197,7 +199,6 @@ function ManageMeals() {
     });
 
     if (dateChangesRef.current) {
-      dateChangesRef.current.open = true;
       dateChangesRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   };
@@ -206,6 +207,7 @@ function ManageMeals() {
     setEditingId(null);
     setForm(emptyForm);
     setError("");
+    setEditorMode("weekly");
   };
 
   const deleteMeal = async (mealId) => {
@@ -240,7 +242,7 @@ function ManageMeals() {
     <>
       <Navbar title={translate("Manage Meals")} />
 
-      <main className="dashboard owner-weekly-menu-page">
+      <OwnerPage className="owner-weekly-menu-page">
 
         <section className="welcome">
           <div>
@@ -248,9 +250,9 @@ function ManageMeals() {
 
             </p>
 
-            <h1>{translate("Your weekly menu")}</h1>
+            <h1>{translate("Manage your menu")}</h1><a href="#a-la-carte-catalogue">{translate("À la carte menu")}</a>
 
-            <p>{translate("Set your menu once for the week. Upcoming meals repeat automatically, and you can update the schedule any time.")}
+            <p>{translate("Plan your regular week here. Use upcoming meals for changes to a single date.")}
 
 
             </p>
@@ -266,8 +268,16 @@ function ManageMeals() {
           </button>
         </section>
 
-        <WeeklyMenuEditor />
 
+        <div ref={dateChangesRef} className="combined-meal-editor">
+          <WeeklyMenuEditor mode={editorMode} onModeChange={setEditorMode} oneTime={{
+            form, onChange: handleChange, onSubmit: handleSubmit, onImage: acceptImage,
+            editingId, onCancel: cancelEdit, saving, error, message
+          }} />
+        </div>
+
+        <details className="meal-schedule-panel">
+          <summary><span>{translate("Upcoming meals by date")}</span><small>{translate("View or change a single date")}</small></summary>
         <section className="management-card">
           <div className="section-heading">
             <div>
@@ -286,19 +296,26 @@ function ManageMeals() {
             </button>
           </div>
 
+          {meals.length > 0 && <label className="schedule-date-filter">{translate("Choose a date")}
+            <select value={scheduleDate || meals[0]?.date || ""} onChange={event => setScheduleDate(event.target.value)}>
+              {[...new Set(meals.map(meal => meal.date))].sort().map(date => <option key={date} value={date}>{new Date(`${date}T12:00:00`).toLocaleDateString(translate.locale, {weekday: 'short', day: 'numeric', month: 'short'})}</option>)}
+            </select>
+          </label>}
+          {error && <p className="alert error" role="alert">{translate(error)}</p>}
+          {message && <p className="alert success" role="status">{translate(message)}</p>}
           {loading ?
           <div className="loading-card">{translate(" Loading meals... ")}
 
           </div> :
           meals.length === 0 ?
-          <div className="empty-card">{translate(" No upcoming meals yet. Set your weekly menu above or add a one-time meal below. ")}
+          <div className="empty-card">{translate("No upcoming meals yet. Set your weekly menu above.")}
 
 
           </div> :
 
           <div className="management-list">
 
-              {meals.map((meal) =>
+              {meals.filter(meal => meal.date === (scheduleDate || meals[0]?.date)).map((meal) =>
             <article
               className="management-row"
               key={meal.id}>
@@ -338,7 +355,7 @@ function ManageMeals() {
                       <p>{translate("Delete this meal?")}</p>
                       {deleteError && <p className="alert error" role="alert">{translate(deleteError)}</p>}
                       <div className="form-actions"><button type="button" className="btn btn-danger-soft" disabled={deleting} onClick={() => deleteMeal(meal.id)}>{translate(deleting ? "Deleting…" : "Confirm delete")}</button><button type="button" className="btn btn-outline" disabled={deleting} onClick={() => {setDeleteId(null);setDeleteError("");}}>{translate("Cancel")}</button></div>
-                    </div> : <><button type="button" className="btn btn-outline" disabled={deleting} onClick={() => startEdit(meal)}>{translate("Edit")}</button><button type="button" className="btn btn-outline" disabled={deleting} onClick={() => {setDeleteId(meal.id);setDeleteError("");}}>{translate("Delete")}</button></>}
+                    </div> : <><button type="button" className="btn btn-outline" disabled={deleting} onClick={() => startEdit(meal)}>{translate("Change this date")}</button><button type="button" className="btn btn-outline" disabled={deleting} onClick={() => {setDeleteId(meal.id);setDeleteError("");}}>{translate("Delete")}</button></>}
                   </div>
 
                 </article>
@@ -347,122 +364,10 @@ function ManageMeals() {
             </div>
           }
         </section>
-
-        <details className="one-time-meal-tools" ref={dateChangesRef}>
-          <summary>{translate("Manage one-time date changes")}</summary>
-        <section className="management-card">
-
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">
-                {translate(editingId ?
-                "EDIT MEAL" :
-                "NEW MEAL")}
-              </p>
-
-              <h2>
-                {translate(editingId ?
-                generating ? "Update menu without photo" : "Update Meal" :
-                generating ? "Save menu without photo" : "Create Meal")}
-              </h2>
-            </div>
-          </div>
-
-          <form
-            className="meal-form"
-            onSubmit={handleSubmit}>
-            
-
-            <div className="form-field">
-              <label>{translate("Date")}</label>
-
-              <input
-                type="date"
-                name="date"
-                value={form.date}
-                onChange={handleChange}
-                required />
-              
-            </div>
-
-            <div className="form-field">
-              <label>{translate("Meal Type")}</label>
-
-              <select
-                name="meal_type"
-                value={form.meal_type}
-                onChange={handleChange}
-                required>
-                
-                <option value="breakfast">{translate(" Breakfast ")}
-
-                </option>
-
-                <option value="lunch">{translate(" Lunch ")}
-
-                </option>
-
-                <option value="dinner">{translate(" Dinner ")}
-
-                </option>
-              </select>
-            </div>
-
-            <MenuItemPicker key={editingId ?? `new-${meals.length}`} value={form.menu_description} onChange={(value) => handleChange({ target: { name: 'menu_description', value } })} />
-
-            <div className="form-field">
-              <label>{translate(" Meal Cutoff Time ")}
-
-              </label>
-
-              <input
-                type="time"
-                name="cutoff_time"
-                value={form.cutoff_time}
-                onChange={handleChange} required />
-              <small>{translate("Uses the meal date selected above. Skips, guests and single-meal orders close at this time.")}</small>
-              
-            </div>
-
-            <label className="form-field">{translate("Single-meal price (₹)")}<input type="number" name="single_price" min="0.01" max="10000" step="0.01" value={form.single_price} onChange={handleChange} placeholder="e.g. 120" /><small>{translate("Leave blank to disable single-meal ordering. Members without a subscription can buy this meal at this price.")}</small></label>
-            <MenuPhotoEditor menu={form.menu_description} imageUrl={form.image_url} onImage={acceptImage} onBusy={setGenerating} />
-            <div className="form-actions">
-
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={saving}>
-                
-                {translate(saving ?
-                "Saving..." :
-                editingId ?
-                generating ? "Update menu without photo" : "Update Meal" :
-                generating ? "Save menu without photo" : "Create Meal")}
-              </button>
-
-              {editingId &&
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={cancelEdit}>{translate(" Cancel Edit ")}
-
-
-              </button>
-              }
-
-            </div>
-            <div className="form-wide" aria-live="polite">
-              {error && <div className="alert error" role="alert">{translate(error)}</div>}
-              {message && <div className="alert success" role="status">{translate(message)}</div>}
-            </div>
-          </form>
-        </section>
-
-
-
         </details>
 
-      </main>
+        <ALaCarteManager />
+      </OwnerPage>
     </>);
 
 }

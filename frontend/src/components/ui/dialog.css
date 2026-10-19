@@ -1,0 +1,26 @@
+.ui-dialog {
+  width: min(560px, calc(100% - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: var(--space-6);
+  overflow: auto;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-dialog);
+  box-shadow: var(--shadow-overlay);
+  z-index: var(--layer-modal);
+}
+.ui-dialog::backdrop { background: rgb(16 35 24 / 55%); }
+.ui-dialog-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-5); }
+.ui-dialog-heading h2 { margin: 6px 0 0; font-size: var(--text-section); line-height: var(--leading-heading); overflow-wrap: anywhere; }
+.ui-dialog-close { flex: 0 0 44px; width: 44px; padding: 10px; }
+.ui-dialog-content { min-width: 0; }
+.ui-dialog-content :is(p, a, strong, label) { overflow-wrap: anywhere; }
+.ui-dialog-content :is(input, select, textarea) { min-width: 0; max-width: 100%; }
+.ui-dialog-content > :first-child { margin-top: 0; }
+.ui-dialog-content form { display: grid; gap: var(--space-4); }
+@media (max-width: 639px) {
+  .ui-dialog { padding: var(--space-5); padding-bottom: max(20px, env(safe-area-inset-bottom)); }
+}

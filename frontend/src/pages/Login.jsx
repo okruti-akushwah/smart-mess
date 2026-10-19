@@ -1,3 +1,6 @@
+import AuthLayout from '../components/AuthLayout';
+import Button from '../components/ui/Button';
+import Icon from '../components/Icon';
 import { useTranslation } from "../i18n/useTranslation";
 import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
@@ -16,6 +19,7 @@ function Login() {
   });
 
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
 
   const handleChange = (event) => {
@@ -61,60 +65,31 @@ function Login() {
     finally { setLoading(false); }
   };
 
-  return (
-    <div className="auth-layout">
-      <section className="auth-hero">
-        <div className="auth-hero-content">
-          <div className="hero-logo">{translate("M")}</div>
-
-          <h1>{translate("Smart Mess")}</h1>
-
-          <h2>{translate(" Smarter meals. ")}
-
-            <br />{translate(" Less waste. ")}
-
-          </h2>
-
-          <p>{translate("Manage your kitchen or explore meals, plans and bills. One sign-in takes you to the right place.")}
-
-
-
-          </p>
-
-          <div className="hero-features">
-            <span>{translate("✓ Live meal management")}</span>
-            <span>{translate("✓ Transparent billing")}</span>
-            <span>{translate("✓ Flexible meal planning")}</span>
-          </div>
-        </div>
-      </section>
-
-      <section className="auth-form-side">
-        <div className="auth-card">
+  return <AuthLayout title={<>{translate("Smarter meals.")}<br />{translate("Less waste.")}</>}
+    description={translate("Manage your kitchen or explore meals, plans and bills. One sign-in takes you to the right place.")}
+    features={[translate("Live meal management"), translate("Transparent billing"), translate("Flexible meal planning")]}>
           <p className="eyebrow">{translate("WELCOME BACK")}</p>
 
-          <h2>{translate("Sign in to Smart Mess")}</h2>
+          <h1>{translate("Sign in to Smart Mess")}</h1>
 
           <p className="muted">{translate("Use your phone and password. We’ll open your owner or member account automatically.")}
 
           </p>
 
-          {location.state?.message && <div className="alert success">{translate(location.state.message)}</div>}
-          <form onSubmit={handleSubmit}>
+          {location.state?.message && <div className="alert success" role="status">{translate(location.state.message)}</div>}
+          <form onSubmit={handleSubmit} aria-busy={loading} aria-describedby={error ? "login-error" : undefined}>
             <label htmlFor="login-phone">{translate("Phone Number")}</label>
             <input id="login-phone" name="phone" type="tel" inputMode="numeric" autoComplete="tel-national" pattern="[0-9]{10}" maxLength={10} placeholder={translate("Enter your phone number")} value={form.phone} onChange={handleChange} required disabled={loading} />
             <label htmlFor="login-password">{translate("Password")}</label>
-            <input id="login-password" name="password" type="password" autoComplete="current-password" placeholder={translate("Enter your password")} value={form.password} onChange={handleChange} required disabled={loading} />
-            {error && <div className="alert error" role="alert">{translate(error)}</div>}
-            <button className="btn btn-primary btn-full" type="submit" disabled={loading}>{translate(loading ? "Logging in..." : "Login")}</button>
+            <div className="password-field"><input id="login-password" name="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" placeholder={translate("Enter your password")} value={form.password} onChange={handleChange} required disabled={loading} /><button type="button" className="password-toggle" aria-label={translate(showPassword ? 'Hide password' : 'Show password')} aria-pressed={showPassword} disabled={loading} onClick={() => setShowPassword(value => !value)}><Icon name={showPassword ? 'eyeOff' : 'eye'} size={20} /></button></div>
+            {error && <div id="login-error" className="alert error" role="alert">{translate(error)}</div>}
+            <Button className="btn-full" type="submit" loading={loading}>{translate(loading ? "Logging in..." : "Login")}</Button>
           </form>
 
-          <p className="auth-footer">{translate("New to Smart Mess?")} <Link to={`/register?next=${encodeURIComponent(returnTo(location))}`}>{translate("Create an account")}</Link></p>
+          <p className="auth-footer">{translate("New to Smart Mess?")} <Link to={`/register?${new URLSearchParams(location.search).get("role") === "owner" ? "role=owner&" : ""}next=${encodeURIComponent(returnTo(location))}`}>{translate("Create an account")}</Link></p>
           <p className="auth-footer"><Link to="/">{translate("Explore messes")}</Link></p>
-        </div>
-      </section>
-    </div>);
-
+          <details className="sign-in-help"><summary>{translate('Sign-in help')}</summary><p>{translate('Check your 10-digit phone number and password.')}</p><p>{translate('For mess questions, find your kitchen in the directory and use its published contact details.')}</p><Link to="/#how-it-works">{translate('How Smart Mess works')}</Link></details>
+  </AuthLayout>;
 }
 
 export default Login;

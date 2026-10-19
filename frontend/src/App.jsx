@@ -1,4 +1,6 @@
+import RouteScroll from "./components/RouteScroll";
 import CustomerPause from "./pages/CustomerPause";
+import PublicSkipLink from "./components/PublicSkipLink";
 import JoinMess from "./pages/JoinMess";
 import CustomerAddress from "./pages/CustomerAddress";
 import ChooseFood from "./pages/ChooseFood";
@@ -48,6 +50,8 @@ import LanguageProvider from "./i18n/LanguageProvider";
 function App() {
   return (
     <BrowserRouter>
+      <RouteScroll />
+      <PublicSkipLink />
       <LanguageProvider><Routes><Route path="/join/:token" element={<JoinMess />} /><Route path="/mess/:token" element={<MessPublic />} />
         <Route path="/owner/reviews" element={<ProtectedRoute requiredRole="owner"><OwnerReviews /></ProtectedRoute>} />
         <Route path="/owner/messages" element={<Navigate to="/owner" replace />} />
@@ -57,7 +61,7 @@ function App() {
         <Route path="/customer/address" element={<ProtectedRoute requiredRole="customer"><CustomerAddress /></ProtectedRoute>} />
         <Route path="/customer/choose" element={<ProtectedRoute requiredRole="customer"><ChooseFood /></ProtectedRoute>} />
         <Route path="/customer/checkout" element={<ProtectedRoute requiredRole="customer"><CustomerCheckout /></ProtectedRoute>} />
-        <Route path="/owner/login" element={<Navigate to="/login" replace />} />
+        <Route path="/owner/login" element={<Navigate to="/login?role=owner" replace />} />
         <Route path="/owner/register" element={<Navigate to="/register?role=owner" replace />} />
         <Route path="/register" element={<Signup />} />
         <Route path="/customer/messes" element={<CustomerMesses />} />

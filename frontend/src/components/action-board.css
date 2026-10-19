@@ -1,0 +1,31 @@
+.action-board { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; }
+.action-tile { --tile-surface:var(--color-mint); --tile-ink:var(--color-brand); position:relative; display:flex; align-items:center; gap:12px; min-width:0; padding:16px; border:1px solid var(--color-border); border-radius:20px; background:var(--color-surface); color:var(--color-text); text-decoration:none; transition:border-color var(--duration-fast),background-color var(--duration-fast); }
+.action-peach { --tile-surface:var(--color-peach); --tile-ink:var(--color-accent-ink); }
+.action-lilac { --tile-surface:var(--color-lilac); --tile-ink:var(--color-lilac-ink); }
+.action-sky { --tile-surface:var(--color-sky); --tile-ink:var(--color-sky-ink); }
+.action-tile-icon { display:grid; place-items:center; flex:0 0 36px; height:36px; border-radius:var(--radius-control); background:var(--tile-surface); color:var(--tile-ink); }
+.action-tile-copy { display:grid; gap:6px; min-width:0; }
+.action-tile-copy strong { font-size:16px; line-height:1.5; }
+.action-tile-copy small { color:var(--color-text-muted); font-size:14px; line-height:1.6; }
+.action-tile-arrow { display:grid; place-items:center; margin-left:auto; flex:0 0 28px; width:28px; height:28px; border-radius:50%; background:var(--tile-surface); color:var(--tile-ink); }
+.action-tile:hover { color:var(--color-text); text-decoration:none; }
+@media(hover:hover) { .action-tile:hover { border-color:var(--tile-ink); } }
+.welcome-artwork { position:relative; align-self:center; justify-self:center; isolation:isolate; width:230px; margin:0; padding:10px; }
+.welcome-artwork img { display:block; position:relative; width:100%; height:auto; aspect-ratio:1.15; object-fit:cover; border-radius:50%; box-shadow:0 8px 20px rgb(38 89 54 / 10%); }
+.welcome-artwork-orbit { position:absolute; inset:4px -12px 16px; z-index:-1; border-radius:50%; background:var(--color-lemon); transform:rotate(-12deg); }
+.welcome-artwork figcaption { position:relative; display:flex; justify-content:center; align-items:center; gap:6px; margin:8px -12px -4px; font-size:13px; line-height:1.5; color:var(--color-text-muted); }
+.purchase-steps ol { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; padding:0; margin:0; list-style:none; }
+.purchase-steps a, .purchase-step-future { display:flex; align-items:center; gap:10px; min-height:56px; height:100%; padding:12px 16px; border:1px solid var(--color-border); border-radius:var(--radius-control); background:var(--color-surface); color:var(--color-text-muted); text-decoration:none; font-size:14px; line-height:1.5; }
+.purchase-step-future { background:transparent; border-style:dashed; }
+.purchase-step-hint { margin:8px 0 0; color:var(--color-text-muted); font-size:14px; }
+.purchase-steps a[aria-current=step] { background:var(--color-mint); color:var(--color-brand); border-color:var(--color-brand); font-weight:600; }
+.purchase-step-number { display:grid; place-items:center; flex:0 0 28px; width:28px; height:28px; border-radius:50%; background:var(--color-surface-subtle); color:var(--color-text); }
+.purchase-steps a[aria-current=step] .purchase-step-number { background:var(--color-brand); color:var(--color-on-brand); }
+@media(width < 900px) { .action-board { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(width < 640px) { .action-board { gap:8px; } .action-tile { padding:12px; gap:8px; align-items:flex-start; } .action-tile-copy small, .action-tile-arrow { display:none; } .action-tile-icon { flex-basis:24px; height:24px; background:transparent; } .welcome-artwork { width:150px; } .purchase-steps ol { gap:6px; } .purchase-steps a, .purchase-step-future { flex-direction:column; gap:6px; padding:10px 6px; min-height:44px; font-size:13px; text-align:center; } .purchase-steps svg { display:none; } }
+@media(prefers-reduced-motion:reduce) { .action-tile,.action-tile-arrow { transition:none; transform:none!important; } }
+
+/* Decorative dashboard mark stays compact so operational content leads. */
+.dashboard-header-mark { position:relative; display:grid; place-items:center; flex:0 0 68px; width:68px; height:68px; margin:8px 16px; border:1px solid var(--color-border); border-radius:22px; background:var(--color-surface); color:var(--color-brand); transform:rotate(-8deg); }
+.dashboard-header-mark > span { position:absolute; right:-14px; bottom:-8px; display:grid; place-items:center; width:36px; height:36px; border-radius:12px; border:3px solid var(--color-surface); background:var(--color-lemon); color:var(--color-accent-ink); transform:rotate(16deg); }
+@media(width < 640px) { .dashboard-header-mark { display:none; } }

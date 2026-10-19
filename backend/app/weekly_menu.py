@@ -25,7 +25,7 @@ def _cutoff_for(day, cutoff_time):
 
 
 def has_customer_activity(db, meal_id):
-    for model in (models.MealOrder, models.DeliveryUpdate, models.Feedback):
+    for model in (models.MealOrder, models.DeliveryUpdate, models.Feedback, models.ALaCarteOrder):
         if db.query(model.id).filter(model.meal_id == meal_id).first():
             return True
     return db.query(models.MealPlan.id).filter_by(meal_id=meal_id).first() is not None
@@ -48,7 +48,7 @@ def sync_weekly_menu(db, owner_id, start=None, days=HORIZON_DAYS):
     activity_ids = set()
     meal_ids = [meal.id for meal in meals_by_slot.values()]
     if meal_ids:
-        for model in (models.MealOrder, models.DeliveryUpdate, models.Feedback, models.MealPlan):
+        for model in (models.MealOrder, models.DeliveryUpdate, models.Feedback, models.MealPlan, models.ALaCarteOrder):
             activity_ids.update(row[0] for row in db.query(model.meal_id).filter(
                 model.meal_id.in_(meal_ids)
             ).distinct().all())

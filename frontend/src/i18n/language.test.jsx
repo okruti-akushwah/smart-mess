@@ -22,25 +22,27 @@ async function hindi(){fireEvent.change(screen.getByLabelText('भाषा / La
 beforeEach(async()=>{localStorage.clear();vi.clearAllMocks();await i18n.changeLanguage('en');});
 afterEach(cleanup);
 describe('live English/Hindi switching',()=>{
- it('hides the language selector on the public home page',()=>{
+ it('shows one language selector on the public home page',()=>{
   mount(<MessDirectory/>, '/#find-mess');
-  expect(screen.queryByLabelText('भाषा / Language')).toBeNull();
+  expect(screen.getAllByLabelText('भाषा / Language')).toHaveLength(1);
  });
  it('keeps the owner menu source unchanged while switching',async()=>{
   mount(<WeeklyMenuEditor/>);
-  const input=await screen.findByPlaceholderText('For example: Dal, rice, seasonal sabzi and roti');
+  const input=await screen.findByRole('textbox',{name:'Menu Description'});
   fireEvent.change(input,{target:{value:'Brand paneer, dal, roti'}});await hindi();
   expect(input.value).toBe('Brand paneer, dal, roti');
-  expect(screen.getByText('पूरा भोजन तैयार करें')).toBeTruthy();
+  expect(screen.getByRole('textbox',{name:'मेन्यू की जानकारी'})).toBe(input);
+  fireEvent.change(screen.getByLabelText('भाषा / Language'),{target:{value:'en'}});
+  await waitFor(()=>expect(screen.getByRole('textbox',{name:'Menu Description'}).value).toBe('Brand paneer, dal, roti'));
  });
  it.each([
   [MessDirectory, 'अपना रोज़ का भोजन खोजें'],
   [ChooseFood, 'आपका अगला भोजन'],
   [CustomerDashboard, 'भोजन ऑर्डर करें'],
-  [OwnerDashboard, 'अच्छा भोजन। आसान प्रबंधन।'],
+  [OwnerDashboard, 'भोजन, अतिथि और ऑर्डर। सब एक जगह।'],
   [CustomerCheckout, 'भुगतान पूरा करें'],
  ])('switches page labels without refreshing: %s',async(Component,hindiLabel)=>{
-  mount(<Component/>);await hindi();
+  mount(<Component/>,Component===MessDirectory?'/':'/login');await hindi();
   if(Component===CustomerDashboard){await screen.findByText('Sharma Tiffin Centre');expect(screen.getAllByText('भोजन ऑर्डर करें').length).toBeGreaterThan(0);}
   else await waitFor(()=>expect(screen.getAllByText(hindiLabel).length).toBeGreaterThan(0));
   fireEvent.change(screen.getByLabelText('भाषा / Language'),{target:{value:'en'}});

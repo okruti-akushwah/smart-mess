@@ -28,7 +28,7 @@ def bill_output(bill, db):
             "start_date": plan.start_date, "end_date": plan.end_date, "name": plan.plan_type,
             "meal_types": included_types(plan), "kind": "meal" if plan.meal_id else "subscription", "status": plan.status,
             "base_amount": float(bill.base_amount), "deductions": float(bill.deductions),
-            "extras_total": float(bill.extras_total), "final_amount": float(bill.final_amount),
+            "extra_lines": bill.extra_lines or [], "extras_total": float(bill.extras_total), "final_amount": float(bill.final_amount),
             "amount_paid": float(paid), "balance_due": float(max(bill.final_amount-paid, Decimal("0")))}
 
 
@@ -37,14 +37,15 @@ def issue_bill(plan_id: int, db: Session = Depends(get_db), owner=Depends(requir
     plan = db.get(models.MealPlan, plan_id)
     if not plan:
         raise HTTPException(404, "Subscription not found")
-    totals = get_current_bill(db, db.get(models.User, plan.user_id))
+    lock_customer(db, plan.user_id)
+    totals = get_current_bill(db, db.get(models.User, plan.user_id), plan.id)
     if totals["plan_id"] != plan_id:
         raise HTTPException(400, "Choose the current subscription")
     previous = db.query(models.IssuedBill).filter_by(plan_id=plan_id).order_by(models.IssuedBill.id.desc()).first()
     fields = ("base_amount", "deductions", "extras_total", "final_amount")
     if previous and all(getattr(previous, f) == Decimal(str(totals[f])) for f in fields):
         return bill_output(previous, db)
-    bill = models.IssuedBill(user_id=plan.user_id, plan_id=plan.id, **{f: totals[f] for f in fields})
+    bill = models.IssuedBill(user_id=plan.user_id, plan_id=plan.id, extra_lines=totals.get("extra_lines", []), **{f: totals[f] for f in fields})
     db.add(bill)
     db.commit()
     db.refresh(bill)
@@ -83,6 +84,9 @@ def validate_submission(db, user, bill_id, amount, reference):
     plan = db.get(models.MealPlan, bill.plan_id)
     if not plan or plan.status == "cancelled":
         raise HTTPException(409, "This checkout was cancelled")
+    latest = db.query(models.IssuedBill).filter_by(plan_id=plan.id).order_by(models.IssuedBill.id.desc()).first()
+    if latest and latest.id != bill.id:
+        raise HTTPException(409, "This bill has been updated. Open the latest bill to pay.")
     if not amount.is_finite() or amount <= 0 or amount > Decimal(str(bill_output(bill, db)["balance_due"])) or amount.as_tuple().exponent < -2:
         raise HTTPException(422, "Enter a positive amount up to the bill balance with at most two decimals")
     if len(reference) > 200:

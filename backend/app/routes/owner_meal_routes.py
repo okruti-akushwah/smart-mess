@@ -36,7 +36,7 @@ def require_owner(
 
 def has_customer_activity(db: Session, meal_id: int) -> bool:
     """Return whether customers have recorded an action tied to this meal."""
-    for model in (models.MealOrder, models.DeliveryUpdate, models.Feedback):
+    for model in (models.MealOrder, models.DeliveryUpdate, models.Feedback, models.ALaCarteOrder):
         if db.query(model.id).filter(model.meal_id == meal_id).first():
             return True
     return False

@@ -27,5 +27,14 @@ def preparation(db):
         models.Meal.date, models.Meal.cutoff_time, models.Meal.id).all()
     latest_date = db.query(models.Meal.date).filter(models.Meal.date < today).order_by(models.Meal.date.desc()).first()
     latest = db.query(models.Meal).filter_by(date=latest_date[0]).all() if latest_date else []
-    return {"preparation": [meal_counts(m, plans, orders) for m in upcoming],
-        "latest_meals": [meal_counts(m, plans, orders) for m in latest]}
+    def with_extras(meal):
+        row = meal_counts(meal, plans, orders)
+        quantities = {}
+        for order in db.query(models.ALaCarteOrder).filter_by(meal_id=meal.id, status='confirmed').all():
+            for line in order.lines:
+                key = (line.item_id, line.name, line.name_hi)
+                quantities[key] = quantities.get(key, 0) + line.quantity
+        row['extra_items'] = [{'item_id':key[0], 'name':key[1], 'name_hi':key[2], 'quantity':quantity} for key,quantity in quantities.items()]
+        return row
+    return {"preparation": [with_extras(m) for m in upcoming],
+        "latest_meals": [with_extras(m) for m in latest]}

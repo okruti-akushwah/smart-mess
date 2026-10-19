@@ -1,0 +1,18 @@
+// @vitest-environment jsdom
+import {it,expect,vi,beforeEach,afterEach} from 'vitest';
+import {render,screen,fireEvent,cleanup,waitFor} from '@testing-library/react';
+import {MemoryRouter} from 'react-router-dom';
+import SubscriptionManager from '../components/SubscriptionManager';
+import MessProfileEditor from '../components/MessProfileEditor';
+import MenuItemPicker from '../components/MenuItemPicker';
+import Payments from './Payments';
+import api from '../services/api';
+vi.mock('../components/Navbar',()=>({default:()=>null}));
+vi.mock('../components/PaymentOptions',()=>({default:()=> <p>QR configuration</p>}));
+vi.mock('../components/BillWorkflow',()=>({default:()=> <p>Payment review</p>}));
+vi.mock('../services/api',()=>({default:{get:vi.fn(),post:vi.fn(),put:vi.fn()},errorMessage:e=>e.message}));
+beforeEach(()=>{vi.clearAllMocks();localStorage.clear();});afterEach(cleanup);
+it('prefills a published offer without removing custom assignment controls',async()=>{api.get.mockImplementation(async u=>({data:u==='/owner/customers'?[{id:1,name:'Aarav',phone:'9000000002'}]:[{id:7,name:'Lunch week',price:700,meal_price:100,meal_types:['lunch'],duration_days:7}]}));render(<MemoryRouter><SubscriptionManager/></MemoryRouter>);fireEvent.change(await screen.findByLabelText('Start from a published plan'),{target:{value:'7'}});expect(screen.getByLabelText('Plan amount (₹)').value).toBe('700');expect(screen.getByRole('checkbox',{name:'lunch'}).checked).toBe(true);fireEvent.change(screen.getByLabelText('Starts on'),{target:{value:'2026-10-18'}});expect(screen.getByLabelText('Ends on').value).toBe('2026-10-24');fireEvent.change(screen.getByLabelText('Ends on'),{target:{value:'2026-10-25'}});expect(api.post).not.toHaveBeenCalled();});
+it('keeps only starting profile details visible and retains optional fields',async()=>{api.get.mockResolvedValue({data:{name:'New kitchen',timings:[],profile_saved:false,join_token:'new'}});render(<MemoryRouter><MessProfileEditor/></MemoryRouter>);await screen.findByLabelText('Mess name (English)');expect(screen.getByLabelText('Public contact number or email')).toBeTruthy();const summary=screen.getByText('More public details (optional)',{selector:'summary'});expect(summary.closest('details').open).toBe(false);fireEvent.click(summary);expect(screen.getByLabelText('About your mess (English)')).toBeTruthy();fireEvent.change(screen.getByLabelText('Mess name (English)'),{target:{value:'Draft kitchen'}});expect(screen.getByText('Unsaved changes')).toBeTruthy();expect(api.put).not.toHaveBeenCalled();});
+it('makes typing primary while saved dish controls remain in a disclosure',async()=>{api.get.mockResolvedValue({data:['Dal','Rice']});render(<MenuItemPicker value='' onChange={()=>{}}/>);expect(screen.getByLabelText('Menu Description')).toBeTruthy();const summary=await screen.findByText('Choose from saved dishes',{selector:'summary'});expect(summary.closest('details').open).toBe(false);});
+it('searches owner payment records and exposes QR setup separately',async()=>{api.get.mockImplementation(async u=>({data:u==='/owner/payments/summary'?{total_received:100,payment_count:1}:[{plan_id:1,name:'Aarav',phone:'9000000002',balance_due:100},{plan_id:2,name:'Priya',phone:'9000000003',balance_due:0}]}));render(<MemoryRouter><Payments/></MemoryRouter>);const search=await screen.findByLabelText('Search members');await waitFor(()=>expect(screen.getAllByText(/Priya/).length).toBeGreaterThan(0));fireEvent.change(search,{target:{value:'Aarav'}});expect(screen.queryByText(/Priya/)).toBeNull();expect(screen.getByText('Payment setup',{selector:'summary'})).toBeTruthy();});

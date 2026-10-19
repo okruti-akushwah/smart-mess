@@ -15,14 +15,22 @@ if TARGET.exists():
     with sqlite3.connect(TARGET) as source, sqlite3.connect(BACKUPS / f'demo-{stamp}.db') as dest:
         source.backup(dest)
 os.environ['DATABASE_URL'] = 'sqlite:///' + TARGET.as_posix()
+os.environ['APP_ENV'] = 'development'
+os.environ['RENDER'] = 'false'
 from app.database import Base, engine, SessionLocal
 from app import models as m
 from app.auth import hash_password
 
-Base.metadata.create_all(engine)
+from app.migrate import upgrade
+from sqlalchemy import MetaData, text
+upgrade(engine, allow_legacy_upgrade=True)
 with engine.begin() as connection:
-    for table in reversed(Base.metadata.sorted_tables):
-        connection.execute(table.delete())
+    connection.execute(text('PRAGMA defer_foreign_keys=ON'))
+    existing = MetaData()
+    existing.reflect(bind=connection)
+    for table in reversed(existing.sorted_tables):
+        if table.name != 'app_schema_revisions':
+            connection.execute(table.delete())
 
 today = datetime.now(timezone(timedelta(hours=5, minutes=30))).date()
 photos = ROOT / 'backend' / 'generated_menu_images'
@@ -129,8 +137,98 @@ with SessionLocal() as db:
             base_amount=100, deductions=0, extras_total=0, final_amount=100)
         add(m.PaymentRecord, owner_id=oid, plan_id=plan.id, amount=100,
             reference='DEMO-SINGLE-MEAL-UPI', receipt_key=uuid4().hex)
+    # Multiple independent kitchens, including a new kitchen with empty sections.
+    for index, name, owner_name, city in [
+        (2, 'Saffron Tiffin House', 'Neha Kapoor', 'Jaipur'),
+        (3, 'Coastal Lunch Studio', 'Arun Nair', 'Bengaluru')]:
+        other = add(m.User, phone=f'900000010{index}', name=owner_name, role='owner', password_hash=password)
+        add(m.JoinInvite, owner_id=other.id, token=f'local-demo-kitchen-{index}')
+        add(m.MessProfile, owner_id=other.id, name=name, owner_name=owner_name,
+            city=city, area='University Road', address=f'{20+index} University Road, {city}',
+            business_type='Tiffin and mess service', food_type='Pure vegetarian',
+            service_type='Lunch and dinner', operating_days='Monday to Saturday',
+            opening_time='10:00', closing_time='21:00', business_status='Active',
+            tagline='Fresh food for your everyday routine',
+            about='Seasonal vegetables, fresh rotis and generous portions prepared daily.')
+        if index == 3:
+            continue
+        second_offer = add(m.PlanOffer, owner_id=other.id, name='Lunch at Saffron',
+            category='regular', duration_days=7, price=700, meal_price=100,
+            meal_types=['lunch'], description='Seven homestyle lunches with dal, roti, rice and sabzi.', active=True)
+        add(m.PlanOffer, owner_id=other.id, name='Previous summer special',
+            category='regular', duration_days=7, price=650, meal_price=90,
+            description='Archived sample offer; should not be purchasable.', active=False)
+        add(m.GuestPricing, owner_id=other.id, price=110)
+        add(m.PaymentSettings, owner_id=other.id, payee_name=name,
+            instructions='Sample payment records only. Do not send real money.')
+        add(m.JoinRequest, owner_id=other.id, user_id=customers[0].id, status='approved')
+        for user, state in [(customers[1], 'pending'), (customers[2], 'rejected')]:
+            request = add(m.JoinRequest, owner_id=other.id, user_id=user.id, status=state)
+            add(m.JoinSelection, owner_id=other.id, request_id=request.id,
+                offer_id=second_offer.id, start_date=today+timedelta(days=1))
+        for offset in range(-2, 8):
+            for kind in ['lunch', 'dinner']:
+                day=today+timedelta(days=offset)
+                add(m.Meal, owner_id=other.id, date=day, meal_type=kind,
+                    menu_description='Rajma, jeera rice, phulka, seasonal sabzi and salad',
+                    image_url='/menu-images/local-demo-dal.webp', single_price=110,
+                    cutoff_time=datetime.combine(day, datetime.min.time()).replace(hour=5 if kind=='lunch' else 12),
+                    is_complimentary=False)
+        cross_plan=add(m.MealPlan, owner_id=other.id, user_id=customers[0].id,
+            offer_id=second_offer.id, plan_type=second_offer.name, price=700, meal_price=100,
+            meal_types=['lunch'], start_date=today, end_date=today+timedelta(days=6),
+            original_start_date=today, original_end_date=today+timedelta(days=6),
+            status='active', accepted=True)
+        add(m.IssuedBill, owner_id=other.id, user_id=customers[0].id, plan_id=cross_plan.id,
+            base_amount=700, deductions=0, extras_total=0, final_amount=700)
+        add(m.PaymentRecord, owner_id=other.id, plan_id=cross_plan.id, amount=700,
+            reference='DEMO-CROSS-MESS', receipt_key=uuid4().hex)
+    for index, state, start, end in [
+        (20, 'expired', today-timedelta(days=40), today-timedelta(days=11)),
+        (21, 'active', today+timedelta(days=3), today+timedelta(days=32)),
+        (22, 'pending_payment', today, today+timedelta(days=29))]:
+        user=add(m.User, phone=f'90000000{index}', name={20:'Vikram Sethi',21:'Aditi Menon',22:'Farhan Ali'}[index],
+            role='customer', password_hash=password, mess_owner_id=oid)
+        add(m.JoinRequest, owner_id=oid, user_id=user.id, status='approved')
+        plan=add(m.MealPlan, owner_id=oid, user_id=user.id, offer_id=offers[2].id,
+            plan_type=offers[2].name, price=4500, meal_price=50,
+            start_date=start, end_date=end, original_start_date=start, original_end_date=end,
+            status=state, accepted=state!='pending_payment')
+        bill=add(m.IssuedBill, owner_id=oid, user_id=user.id, plan_id=plan.id,
+            base_amount=4500, deductions=0, extras_total=0, final_amount=4500)
+        if state=='pending_payment':
+            add(m.PaymentSubmission, owner_id=oid, user_id=user.id, bill_id=bill.id,
+                amount=4500, method='upi', reference='DEMO-REJECTED-PROOF', status='rejected')
+    add(m.User, phone='9000000030', name='Kavya Iyer', role='customer', password_hash=password)
+    for weekday in range(7):
+        for kind in menus:
+            menu, photo=menus[kind][weekday%3]
+            add(m.WeeklyMenuEntry, owner_id=oid, weekday=weekday, meal_type=kind,
+                menu_description=menu, image_url=f'/menu-images/local-demo-{photo}.webp',
+                single_price=60 if kind=='breakfast' else 100, is_complimentary=False,
+                cutoff_time={'breakfast':'01:30','lunch':'05:30','dinner':'12:30'}[kind])
+    profile=db.get(m.MessProfile, oid)
+    profile.owner_name=owner.name
+    profile.city='Pune'
+    profile.area='College Road'
+    profile.food_type='Pure vegetarian'
+    profile.business_type='Tiffin and mess service'
+    profile.service_type='Breakfast, lunch and dinner'
+    profile.operating_days='Monday to Sunday'
+    profile.opening_time='07:30'
+    profile.closing_time='21:00'
+    profile.business_status='Active'
+    for dish in ['Dal', 'Roti', 'Rice', 'Sabzi', 'Salad', 'Raita', 'Paneer', 'Poha']:
+        add(m.MenuItem, owner_id=oid, key=dish.lower(), name=dish)
+    for user, stage in [(customers[1], 'preparing'), (customers[2], 'out_for_delivery')]:
+        add(m.DeliveryUpdate, owner_id=oid, user_id=user.id,
+            meal_id=meals[0, 'dinner'].id, status=stage)
+    # Persisted pause is applied by the normal meal synchronization flow.
+    add(m.MealDatePause, owner_id=oid, user_id=customers[3].id, plan_id=plans[3].id,
+        date=today+timedelta(days=2), active=True)
+    meals[7, 'breakfast'].single_price=None
     db.commit()
-    print('Local demo ready: 1 owner, 12 customers, 45 menus, 4 offers, 10 subscriptions, 2 personal orders, 6 reviews.')
+    print('Local demo ready: 3 owners, 16 customers, multiple messes and subscription/payment edge cases.')
     print('Owner: 9000000001 | Customer: 9000000002 | Password: Demo1234!')
 
 # Preserve the prior connection settings privately before switching the local app.

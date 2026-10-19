@@ -41,12 +41,12 @@ function FloatingChat({ owner }) {
   useEffect(() => {
     if (!open) return;
     closeButton.current?.focus();
-    function escape(event) { if (event.key === 'Escape') { setOpen(false); button.current?.focus(); } }
+    function escape(event) { if (event.key === 'Escape' && !document.querySelector('dialog[open]')) { setOpen(false); button.current?.focus(); } }
     window.addEventListener('keydown', escape);
     return () => window.removeEventListener('keydown', escape);
   }, [open]);
   return <div className="floating-chat">
     {open && <section className="floating-chat-box" id="mess-chat-box" role="dialog" aria-labelledby="floating-chat-title"><header className="floating-chat-heading"><Icon name="chat" size={23} /><div><h2 id="floating-chat-title">{translate(owner ? 'Member messages' : 'Chat with owner')}</h2><p>{translate('Private mess conversation')}</p></div><button type="button" ref={closeButton} className="chat-close" aria-label={translate('Close chat')} onClick={() => { setOpen(false); button.current?.focus(); }}>×</button></header><ChatPanel /></section>}
-    <button type="button" className="floating-chat-launcher" ref={button} aria-label={translate(open ? 'Close chat' : 'Open chat')} aria-expanded={open} aria-controls="mess-chat-box" onClick={() => setOpen(value => !value)}><Icon name="chat" size={25} />{unread > 0 && <span className="floating-chat-badge" aria-label={`${translate('Unread messages')}: ${unread}`}>{unread > 99 ? '99+' : unread}</span>}</button>
+    <button type="button" className="floating-chat-launcher" ref={button} tabIndex={open ? -1 : 0} aria-label={translate(open ? 'Close chat' : 'Open chat')} aria-expanded={open} aria-controls="mess-chat-box" onClick={() => setOpen(value => !value)}><Icon name="chat" size={25} />{unread > 0 && <span className="floating-chat-badge" aria-label={`${translate('Unread messages')}: ${unread}`}>{unread > 99 ? '99+' : unread}</span>}</button>
   </div>;
 }

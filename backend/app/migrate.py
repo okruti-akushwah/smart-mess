@@ -8,7 +8,7 @@ from pathlib import Path
 from sqlalchemy import Column, DateTime, MetaData, String, Table, inspect, select, text
 
 
-REVISIONS = ("0001_baseline", "0002_concurrency_invariants", "0003_pause_date_credits", "0004_weekly_menu", "0005_multi_mess_memberships", "0006_business_details", "0007_in_app_chat")
+REVISIONS = ("0001_baseline", "0002_concurrency_invariants", "0003_pause_date_credits", "0004_weekly_menu", "0005_multi_mess_memberships", "0006_business_details", "0007_in_app_chat", "0008_kitchen_location", "0009_a_la_carte")
 VERSION_TABLE = Table("app_schema_revisions", MetaData(),
                       Column("revision", String(64), primary_key=True),
                       Column("applied_at", DateTime, nullable=False))
@@ -26,6 +26,8 @@ for _table in ("bills", "feedback", "plan_requests", "delivery_profiles", "deliv
                "payment_records", "payment_settings", "issued_bills", "payment_submissions",
                "join_selections", "guest_pricing"):
     LEGACY_ADDITIONS[_table] = {"owner_id"}
+LEGACY_ADDITIONS['mess_profiles'].update({'latitude', 'longitude'})
+LEGACY_ADDITIONS['issued_bills'].add('extra_lines')
 
 
 def schema_status(connection):
@@ -159,6 +161,16 @@ def in_app_chat(connection):
     ChatMessage.__table__.create(connection, checkfirst=True)
 
 
+def kitchen_location(connection):
+    from app.migrations import add_kitchen_location
+    add_kitchen_location(connection)
+
+
+def a_la_carte(connection):
+    from app.migrations import add_a_la_carte
+    add_a_la_carte(connection)
+
+
 OPERATIONS = {
     "0001_baseline": baseline,
     "0002_concurrency_invariants": concurrency_invariants,
@@ -167,6 +179,8 @@ OPERATIONS = {
     "0005_multi_mess_memberships": multi_mess_memberships,
     "0006_business_details": business_details,
     "0007_in_app_chat": in_app_chat,
+    "0008_kitchen_location": kitchen_location,
+    "0009_a_la_carte": a_la_carte,
 }
 
 
@@ -192,8 +206,13 @@ def upgrade(engine, allow_legacy_upgrade=False):
         for revision in report["pending"]:
             OPERATIONS[revision](connection)
             migrated = schema_status(connection)
-            missing_now = {table: columns for table, columns in migrated['missing'].items()
-                           if table != 'chat_messages' or revision == '0007_in_app_chat'}
+            missing_now = {table: [c for c in columns if not (
+                (table == 'mess_profiles' and c in ('latitude', 'longitude') and revision < '0008_kitchen_location') or
+                (table == 'issued_bills' and c == 'extra_lines' and revision < '0009_a_la_carte'))]
+                for table, columns in migrated['missing'].items()
+                if (table != 'chat_messages' or revision >= '0007_in_app_chat') and
+                   (not table.startswith('a_la_carte_') or revision >= '0009_a_la_carte')}
+            missing_now = {table: columns for table, columns in missing_now.items() if columns}
             if missing_now or (revision == "0002_concurrency_invariants" and migrated["missing_indexes"]):
                 raise RuntimeError("Migration did not produce the expected schema")
             connection.execute(VERSION_TABLE.insert().values(

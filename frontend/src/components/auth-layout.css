@@ -1,0 +1,54 @@
+.auth-layout.auth-page { grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); min-height: calc(100svh - 64px); background: var(--color-canvas); }
+.auth-page .auth-form-side { grid-column: 2; grid-row: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-8); padding: var(--space-12) var(--page-gutter); }
+.auth-page .auth-home-link { display: inline-flex; align-items: center; gap: var(--space-2); width: min(100%, var(--layout-auth)); font-size: 18px; color: var(--color-brand); }
+.auth-page .auth-card { max-width: var(--layout-auth); padding: var(--space-8); border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-surface); box-shadow: var(--shadow-small); }
+.auth-page .auth-card h1 { margin: 8px 0 12px; font-size: var(--text-title); line-height: var(--leading-heading); overflow-wrap: anywhere; }
+.auth-page .auth-card > p { font-size: var(--text-label); line-height: var(--leading-body); }
+.auth-page .auth-card .muted { margin: 0 0 var(--space-6); }
+.auth-page .auth-card form { gap: 0; }
+.auth-page .auth-card label { display: block; margin: var(--space-5) 0 var(--space-2); color: var(--color-text); font-weight: 600; }
+.auth-page .auth-card input, .auth-page .auth-card select { min-height: 48px; padding: 11px 14px; border: 1px solid var(--color-control-border); border-radius: var(--radius-control); background: var(--color-surface); color: var(--color-text); font-size: var(--text-body); line-height: 1.4; }
+.auth-page .auth-card input:hover, .auth-page .auth-card select:hover { border-color: var(--color-brand); }
+.auth-page .auth-card input:focus, .auth-page .auth-card select:focus { border-color: var(--color-brand); box-shadow: 0 0 0 3px rgb(23 119 78 / 14%); }
+.auth-page .auth-card input:-webkit-autofill, .auth-page .auth-card input:-webkit-autofill:hover, .auth-page .auth-card input:-webkit-autofill:focus { -webkit-text-fill-color: var(--color-text); -webkit-box-shadow: 0 0 0 100px var(--color-surface) inset; caret-color: var(--color-text); }
+.auth-page .auth-card .btn-full { min-height: 48px; margin-top: var(--space-6); }
+.auth-page .password-field { position: relative; display: block; }
+.auth-page .password-field input { width: 100%; min-width: 0; margin: 0; padding-right: 52px; }
+.auth-page .password-toggle { position: absolute; top: 50%; right: 6px; display: grid; place-items: center; width: 36px; min-height: 36px; padding: 0; border: 0; border-radius: 8px; color: var(--color-brand); background: transparent; cursor: pointer; outline: none; transform: translateY(-50%); }
+.auth-page .password-toggle:hover { background: var(--color-secondary); }
+.auth-page .password-toggle:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 1px; }
+.auth-page .password-toggle[aria-pressed=true] { background: var(--color-secondary); }
+.auth-page .auth-footer { margin: var(--space-6) 0 0; padding-top: var(--space-4); border-top: 1px solid var(--color-border); }
+.auth-page .auth-footer + .auth-footer { margin-top: var(--space-3); padding-top: 0; border: 0; }
+.auth-page .auth-hero { grid-column: 1; grid-row: 1; padding: clamp(32px, 5vw, 72px); background: linear-gradient(135deg, rgb(13 42 28 / 94%), rgb(13 42 28 / 77%)), url('../assets/thali.png') center / cover; }
+.auth-page .auth-hero h2 { font-size: clamp(28px, 3.5vw, 44px); line-height: var(--leading-heading); margin: 12px 0 20px; letter-spacing: var(--tracking-heading); color: #fff; }
+.auth-page .auth-hero p { color: #edf6ef; font-size: 16px; line-height: var(--leading-body); }
+.auth-page .auth-hero .auth-hero-kicker { color: var(--color-accent); font-size: var(--text-label); font-weight: 600; }
+.auth-page .hero-features { gap: var(--space-4); margin-top: var(--space-8); font-size: var(--text-label); }
+.auth-page .hero-features span { display: flex; gap: var(--space-3); align-items: center; }
+.auth-page .hero-features svg { flex-shrink: 0; color: var(--color-accent); }
+.auth-page .auth-hero .auth-image-note { margin-top: var(--space-12); font-size: var(--text-meta); }
+.auth-page .signup-steps { gap: var(--space-3); margin-block: var(--space-5); padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-control); background: var(--color-surface-subtle); line-height: 1.6; }
+.auth-page .signup-steps > span { margin-left: 0; }
+.auth-page .otp-inline { margin-block: var(--space-4); padding: var(--space-4); border-color: var(--color-border); background: var(--color-surface-subtle); }
+.auth-page .otp-inline p, .auth-page .phone-hint, .auth-page #signup-password-help { font-size: var(--text-meta); line-height: var(--leading-body); color: var(--color-text-muted); }
+.auth-page .otp-inline input { letter-spacing: .2em; font-size: 22px; }
+.auth-page .otp-inline .btn-full { margin-top: var(--space-3); }
+.auth-page .otp-actions .btn { min-height: 44px; }
+.join-entry { max-width: 760px; }
+.join-entry .join-signup-card { margin-top: var(--space-4); border-radius: var(--radius-card); border-color: var(--color-border); box-shadow: var(--shadow-small); }
+.join-entry .join-entry-symbol { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: var(--space-6); border-radius: 12px; background: var(--color-secondary); color: var(--color-brand); }
+.join-entry .join-entry-links { display: flex; flex-wrap: wrap; gap: var(--space-4); margin-top: var(--space-8); padding-top: var(--space-5); border-top: 1px solid var(--color-border); }
+@media (width < 900px) {
+  .auth-layout.auth-page { display: flex; flex-direction: column; }
+  .auth-page .auth-form-side { padding: var(--space-6) var(--page-gutter) var(--space-10); gap: var(--space-5); }
+  .auth-page .auth-card { padding: var(--space-6); }
+  .auth-page .auth-hero { min-height: 0; padding: var(--space-8) var(--page-gutter); }
+  .auth-page .auth-hero-content { max-width: var(--layout-auth); margin-inline: auto; }
+  .auth-page .auth-hero .auth-image-note { margin-top: var(--space-6); }
+}
+.sign-in-help { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--color-border); }
+.sign-in-help summary { cursor: pointer; font-weight: 600; color: var(--color-brand); padding-block: 8px; }
+.sign-in-help p { font-size: var(--text-label); color: var(--color-text-muted); line-height: var(--leading-body); }
+
+.signup-steps [aria-current="step"]{font-weight:700;color:var(--color-brand);text-decoration:underline;text-underline-offset:4px}
