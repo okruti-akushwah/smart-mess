@@ -13,6 +13,7 @@ from app.routes.billing_routes import get_current_bill
 from app.subscription_extensions import lock_customer
 from app.auth import get_current_user
 from app.payment_uploads import PAYMENT_IMAGE_DIR
+from app.image_uploads import MAX_IMAGE_UPLOAD_BYTES, image_extension, stored_payment_image
 from fastapi.responses import HTMLResponse
 from html import escape
 from datetime import timezone, timedelta
@@ -91,15 +92,14 @@ def save_methods(body: SettingsInput, db: Session = Depends(get_db), owner=Depen
 
 @router.post("/owner/payment-qr")
 async def upload_qr(file: UploadFile = File(...), db: Session = Depends(get_db), owner=Depends(require_owner)):
-    content = await file.read(5 * 1024 * 1024 + 1)
-    await file.close()
-    if len(content) > 5 * 1024 * 1024:
+    try:
+        content = await file.read(MAX_IMAGE_UPLOAD_BYTES + 1)
+    finally:
+        await file.close()
+    if len(content) > MAX_IMAGE_UPLOAD_BYTES:
         raise HTTPException(413, "Choose an image smaller than 5 MB")
-    if content.startswith(b"\x89PNG\r\n\x1a\n") and len(content) >= 45 and content[12:16] == b"IHDR" and content.endswith(b"IEND\xaeB`\x82"):
-        extension = ".png"
-    elif content.startswith(b"\xff\xd8\xff") and content.endswith(b"\xff\xd9") and len(content) >= 20:
-        extension = ".jpg"
-    else:
+    extension = image_extension(content, strict_png=True, strict_jpeg=True)
+    if extension is None:
         raise HTTPException(422, "Upload a PNG or JPEG image of your payment QR")
     # Ignore supplied filenames and use immutable URLs so browsers show replacements immediately.
     filename = uuid4().hex + extension
@@ -115,8 +115,8 @@ async def upload_qr(file: UploadFile = File(...), db: Session = Depends(get_db),
         path.unlink(missing_ok=True)
         raise
     if old_url:
-        old_file = PAYMENT_IMAGE_DIR / old_url.rsplit("/", 1)[-1]
-        if old_file.parent == PAYMENT_IMAGE_DIR:
+        old_file = stored_payment_image(PAYMENT_IMAGE_DIR, old_url)
+        if old_file:
             old_file.unlink(missing_ok=True)
     return {"message": "Payment QR uploaded. Customers can now view it in Bills.", **settings_output(item)}
 
@@ -128,8 +128,8 @@ def remove_qr(db: Session = Depends(get_db), owner=Depends(require_owner)):
     item.qr_url = None
     db.commit()
     if old_url:
-        path = PAYMENT_IMAGE_DIR / old_url.rsplit("/", 1)[-1]
-        if path.parent == PAYMENT_IMAGE_DIR:
+        path = stored_payment_image(PAYMENT_IMAGE_DIR, old_url)
+        if path:
             path.unlink(missing_ok=True)
     return {"message": "QR removed. Upload a QR to enable customer payment.", **settings_output(item)}
 

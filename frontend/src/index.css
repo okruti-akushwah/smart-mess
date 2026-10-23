@@ -1034,9 +1034,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 .today-menu-section { margin-bottom: 32px; }
 
-.language-toolbar { display:flex; justify-content:flex-end; align-items:center; gap:10px; padding:8px clamp(16px, 3vw, 48px); background:#f3f6ee; border-bottom:1px solid #dce3d5; color:#244e3b; font-size:14px; }
+.language-toolbar { position:relative; z-index:calc(var(--layer-header) + 1); display:flex; justify-content:flex-end; align-items:center; gap:10px; min-height:48px; padding:4px clamp(16px, 3vw, 48px); background:#f3f6ee; border-bottom:1px solid #dce3d5; color:#244e3b; font-size:14px; }
 .language-toolbar label { margin:0; font-weight:600; }
-.language-toolbar select { width:auto; min-width:100px; padding:6px 12px; border:1px solid #b8cbbf; border-radius:8px; background:#fff; color:#153b29; font:inherit; }
+.language-toolbar select { width:auto; min-width:100px; min-height:36px; padding:4px 12px; border:1px solid #b8cbbf; border-radius:8px; background:#fff; color:#153b29; font:inherit; }
 html[lang="hi"] body { font-family: var(--font-hindi); }
 html[lang="hi"] .eyebrow { letter-spacing:0.03em; line-height:1.8; }
 html[lang="hi"] .btn { white-space:normal; line-height:1.5; }

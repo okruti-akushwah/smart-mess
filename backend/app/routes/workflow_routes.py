@@ -15,6 +15,7 @@ from app.routes.owner_meal_routes import require_owner
 from app.routes.discovery_routes import customer
 from app.routes.billing_routes import get_current_bill
 from app.subscription_extensions import lock_customer
+from app.image_uploads import MAX_IMAGE_UPLOAD_BYTES, image_extension
 
 router = APIRouter(tags=["bill workflow"])
 PROOF_DIR = Path(__file__).resolve().parents[2] / "payment_proofs"
@@ -104,15 +105,14 @@ async def submit_payment(bill_id: int = Form(...), amount: Decimal = Form(...),
     db.rollback()  # Release the read snapshot before any upload wait or lock attempt.
     if not file:
         raise HTTPException(422, "Upload your payment screenshot")
-    content = await file.read(5 * 1024 * 1024 + 1)
-    await file.close()
-    if len(content) > 5 * 1024 * 1024:
+    try:
+        content = await file.read(MAX_IMAGE_UPLOAD_BYTES + 1)
+    finally:
+        await file.close()
+    if len(content) > MAX_IMAGE_UPLOAD_BYTES:
         raise HTTPException(413, "Screenshot must be smaller than 5 MB")
-    if content.startswith(b"\x89PNG\r\n\x1a\n") and content.endswith(b"IEND\xaeB`\x82"):
-        ext = ".png"
-    elif content.startswith(b"\xff\xd8\xff") and content.endswith(b"\xff\xd9"):
-        ext = ".jpg"
-    else:
+    ext = image_extension(content)
+    if ext is None:
         raise HTTPException(422, "Upload a PNG or JPEG screenshot")
     if not lock_customer(db, user.id):
         raise HTTPException(404, "Customer not found")

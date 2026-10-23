@@ -15,7 +15,7 @@ export default function LanguageProvider({children}) {
     document.documentElement.lang=language;
   },[language]);
   return <LanguageContext.Provider value={{language,setLanguage,inWorkspace}}>
-    {pathname !== '/' && !inWorkspace && <div className="language-toolbar"><LanguageSwitcher /></div>}
+    <div className="language-toolbar"><LanguageSwitcher /></div>
     {children}
   </LanguageContext.Provider>;
 }

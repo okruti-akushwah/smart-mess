@@ -99,6 +99,17 @@ it('navigates from the mobile menu and preserves customer order query strings', 
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 });
 
+it('opens the meal menu from the Skip meals navigation tab', async () => {
+  localStorage.setItem('role', 'customer');
+  mount('/customer');
+  fireEvent.click(screen.getByRole('button', { name: 'More navigation' }));
+  fireEvent.click(within(await screen.findByRole('dialog')).getByRole('link', { name: 'Skip meals' }));
+  expect(screen.getByTestId('location').textContent).toBe('/customer#skip-meals');
+  fireEvent.click(screen.getByRole('button', { name: 'More navigation' }));
+  const drawer = await screen.findByRole('dialog', { name: 'More options' });
+  expect(within(drawer).getByRole('link', { name: 'Skip meals' }).getAttribute('aria-current')).toBe('page');
+});
+
 it('provides one workspace language control and translates an already-open menu', async () => {
   mount();
   expect(screen.getAllByLabelText('भाषा / Language')).toHaveLength(1);

@@ -6,6 +6,7 @@
 .extras-item-list { margin-bottom:20px; }
 .extras-orders > h2 { margin:0 0 20px; }
 .extras-order-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr)); align-items:start; gap:16px; }
+.extras-order-list + .btn { margin-top:16px; }
 .extras-order { min-width:0; padding:20px; border:1px solid var(--color-border); border-radius:16px; background:var(--color-surface); overflow-wrap:anywhere; }
 .extras-order .extras-order-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
 .extras-order-heading > div { min-width:0; }

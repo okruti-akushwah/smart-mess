@@ -1,11 +1,12 @@
 import { useTranslation } from "../i18n/useTranslation";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import { headcountSnapshot, headcountIncreased } from "../services/headcountSound";
 import { incomingMessageCursor, hasIncomingMessage } from "../services/chatSound";
 
 let audioContext;
-let enabled = false;
+let enabled = true;
 const chatCursors = new Map();
 
 function accountKey() {
@@ -31,11 +32,34 @@ function chime() {
 
 export default function NotificationSound({ role, compact = false }) {
   const translate = useTranslation();
+  const navigate = useNavigate();
 
-  const [on, setOn] = useState(enabled);
-  const [error, setError] = useState("");
+  const [notificationCount, setNotificationCount] = useState(0);
+  const [pendingBySource, setPendingBySource] = useState({ join: 0, payment: 0, order: 0 });
   const messToken = localStorage.getItem('activeMessToken');
   const chatAccount = accountKey();
+  useEffect(() => {
+    if (!['owner', 'customer'].includes(role)) return undefined;
+    let active = true;
+    const activateAudio = async () => {
+      const Audio = window.AudioContext || window.webkitAudioContext;
+      if (!Audio) return;
+      try {
+        audioContext ||= new Audio();
+        if (audioContext.state !== 'running') await audioContext.resume();
+        if (active) enabled = true;
+      } catch { /* Browsers may keep audio suspended until another user gesture. */ }
+      window.removeEventListener('pointerdown', activateAudio);
+      window.removeEventListener('keydown', activateAudio);
+    };
+    window.addEventListener('pointerdown', activateAudio);
+    window.addEventListener('keydown', activateAudio);
+    return () => {
+      active = false;
+      window.removeEventListener('pointerdown', activateAudio);
+      window.removeEventListener('keydown', activateAudio);
+    };
+  }, [role]);
   useEffect(() => {
     if (!['owner', 'customer'].includes(role) || !chatAccount || (role === 'customer' && !messToken)) return;
     const key = `${chatAccount}:${messToken || 'owner'}`;
@@ -107,11 +131,15 @@ export default function NotificationSound({ role, compact = false }) {
           ]);
           if (responses.some(r => r.status === 'rejected')) return;
           const [joins, payments, orders] = responses.map(r => r.value.data);
+          const pendingPayments = payments.filter(r => r.status === 'pending');
+          const pendingOrders = orders.filter(r => r.status === 'pending_acceptance' && !r.accepted);
+          setPendingBySource({ join: joins.length, payment: pendingPayments.length, order: pendingOrders.length });
           ids = [...joins.map(r => `join:${r.id}`),
-            ...payments.filter(r => r.status === 'pending').map(r => `payment:${r.id}`),
-            ...orders.filter(r => r.status === 'pending_acceptance' && !r.accepted).map(r => `order:${r.plan_id}`)];
+            ...pendingPayments.map(r => `payment:${r.id}`),
+            ...pendingOrders.map(r => `order:${r.plan_id}`)];
         }
         if (!active) return;
+        setNotificationCount(ids.length);
         const hasNew = ids.some(id => !seen.has(id));
         if (initialized && hasNew) chime();
         ids.forEach(id => seen.add(id));
@@ -125,16 +153,12 @@ export default function NotificationSound({ role, compact = false }) {
     window.addEventListener('focus', load);
     return () => { active = false; clearInterval(timer); window.removeEventListener('focus', load); };
   }, [role]);
-  async function toggle() {
-    if (enabled) { enabled = false; setOn(false); return; }
-    try {
-      const Audio = window.AudioContext || window.webkitAudioContext;
-      if (!Audio) throw new Error('Sound unavailable');
-      audioContext ||= new Audio();
-      await audioContext.resume();
-      enabled = audioContext.state === 'running'; setOn(enabled); setError('');
-      chime();
-    } catch { setError('Notification sound is unavailable in this browser.'); }
-  }
-  return <div className="notification-sound"><button className={`btn btn-outline${compact ? ' workspace-icon-button' : ''}`} type="button" onClick={toggle} aria-pressed={on} aria-label={on ? translate("Mute notification sound") : translate("Enable notification sound")} title={on ? translate("Notification sound on — click to mute") : translate("Enable notification sound")}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" /><path d="M10 21h4" />{!on && <path d="M3 3l18 18" />}</svg></button>{error && <small role="status">{translate(error)}</small>}</div>;
+  if (role !== 'owner') return null;
+  const openNotifications = () => {
+    if (pendingBySource.join) navigate('/owner/requests');
+    else if (pendingBySource.payment) navigate('/owner/requests#payment-confirmations');
+    else if (pendingBySource.order) navigate('/owner#personal-orders');
+    else navigate('/owner/requests');
+  };
+  return <div className="notification-sound"><button className={`btn btn-outline${compact ? ' workspace-icon-button' : ''}`} type="button" onClick={openNotifications} aria-label={`${translate('Open notifications')}${notificationCount > 0 ? `: ${notificationCount}` : ''}`} title={translate('Open notifications')}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" /><path d="M10 21h4" /></svg>{notificationCount > 0 && <span className="workspace-sound-badge" aria-hidden="true">{notificationCount > 9 ? '9+' : notificationCount}</span>}</button></div>;
 }

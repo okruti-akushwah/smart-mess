@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import api from "../services/api";
 import { useTranslation } from "../i18n/useTranslation";
 import BillNotification from "./BillNotification";
@@ -6,19 +6,16 @@ import NotificationSound from "./NotificationSound";
 import Icon from "./Icon";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 
-import { LanguageContext } from '../i18n/LanguageContext';
-import LanguageSwitcher from '../i18n/LanguageSwitcher';
 import Button from './ui/Button';
 import Drawer from './ui/Drawer';
 import './navbar.css';
 
-const navIcon = label => ({ Dashboard: 'home', 'AI Advisor': 'wand', Members: 'people', 'My messes': 'people', Requests: 'inbox', Meals: 'meal', 'Order food': 'meal', Subscription: 'calendar', Subscriptions: 'calendar', 'Pause meals': 'pause', Bills: 'bill', Payments: 'bill', 'Meal history': 'calendar', Reviews: 'star', Settings: 'settings', 'Public page': 'home' }[label] || 'home');
+const navIcon = label => ({ Dashboard: 'home', 'AI Advisor': 'wand', Members: 'people', 'My messes': 'people', Requests: 'inbox', Meals: 'meal', 'Order food': 'meal', Subscription: 'calendar', Subscriptions: 'calendar', 'Pause meals': 'pause', 'Skip meals': 'pause', Bills: 'bill', Payments: 'bill', 'Meal history': 'calendar', Reviews: 'star', Settings: 'settings', 'Public page': 'home' }[label] || 'home');
 
 function Navbar({ title = "Dashboard" }) {
   const translate = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
-  const { inWorkspace } = useContext(LanguageContext);
   const [openFor, setOpenFor] = useState(null);
   const [headerVisible, setHeaderVisible] = useState(true);
   const [desktopNavigation, setDesktopNavigation] = useState(() => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(min-width: 1100px)').matches);
@@ -84,7 +81,7 @@ function Navbar({ title = "Dashboard" }) {
     ['/owner/bills', 'Bills'], ['/owner/reviews', 'Reviews'], ['/owner/kitchen-advisor', 'AI Advisor'],
     ['/owner/settings', 'Settings'],
   ] : [
-    ['/customer/messes', 'My messes'], ['/customer', 'Dashboard'], ['/customer/choose?type=meal', 'Order food'],
+    ['/customer/messes', 'My messes'], ['/customer', 'Dashboard'], ['/customer#skip-meals', 'Skip meals'], ['/customer/choose?type=meal', 'Order food'],
     ['/customer/plans', 'Subscriptions'], ['/customer/pause', 'Pause meals'],
     ['/customer/history', 'Meal history'], ['/customer/bills', 'Bills'], ['/customer/reviews', 'Reviews'],
   ];
@@ -93,12 +90,11 @@ function Navbar({ title = "Dashboard" }) {
     : ['My messes', 'Dashboard', 'Order food', 'Subscriptions'];
   const primaryLinks = links.filter(([, label]) => primaryLabels.includes(label));
   const secondaryLinks = links.filter(([, label]) => !primaryLabels.includes(label));
-  const secondaryPage = !primaryLinks.some(([path]) => location.pathname === path.split('?')[0] || (path === '/customer/plans' && location.pathname.startsWith('/customer/plans/')));
+  const secondaryPage = !primaryLinks.some(([path]) => (path === '/customer#skip-meals' ? location.pathname === '/customer' && location.hash === '#skip-meals' : location.pathname === path.split(/[?#]/)[0] || (path === '/customer/plans' && location.pathname.startsWith('/customer/plans/'))));
   const navigation = (items = links) => items.map(([path, label]) => <Link key={path} to={path}
-    aria-current={location.pathname === path.split('?')[0] || (path === '/customer/plans' && location.pathname.startsWith('/customer/plans/')) ? 'page' : undefined}
+    aria-current={(path === '/customer#skip-meals' ? location.pathname === '/customer' && location.hash === '#skip-meals' : location.pathname === path.split(/[?#]/)[0] && !(label === 'Dashboard' && location.hash === '#skip-meals')) || (path === '/customer/plans' && location.pathname.startsWith('/customer/plans/')) ? 'page' : undefined}
     onClick={() => setOpenFor(null)}><Icon name={navIcon(label)} /><span>{translate(label)}</span></Link>);
   const tools = <div className="workspace-utility-tools">
-    {inWorkspace && <div className="workspace-language-control"><LanguageSwitcher compact /></div>}
     <div className="workspace-account-tools"><NotificationSound role={role} compact />{role === 'customer' && <BillNotification />}<Button variant="outline" className="workspace-logout" onClick={logout}>{translate('Logout')}</Button></div>
   </div>;
 
@@ -114,10 +110,10 @@ function Navbar({ title = "Dashboard" }) {
       </Link>
       <nav className="workspace-desktop-nav" aria-label={translate('Main navigation')}>{navigation(primaryLinks)}</nav>
       <div className="workspace-top-actions">
-        {tools}
         <div className={`workspace-navigation-control${secondaryPage ? ' workspace-navigation-control-active' : ''}`} role="group" aria-label={translate('Menu')}>
           <Button ref={menuTriggerRef} variant="outline" className="workspace-menu-toggle" aria-label={translate('More navigation')} aria-haspopup="dialog" aria-controls={menuOpen ? 'workspace-navigation' : undefined} aria-expanded={menuOpen} onClick={() => setOpenFor(location.key)}><Icon name="menu" /><span className="workspace-menu-label">{translate('Menu')}</span><span className="workspace-more-label" aria-hidden="true">{translate('More')}</span></Button>
         </div>
+        {tools}
       </div>
     </div>
     <Drawer id="workspace-navigation" open={menuOpen} title={translate('More options')} onClose={() => setOpenFor(null)} className="workspace-menu-drawer" desktopPopover anchorRef={menuTriggerRef}>

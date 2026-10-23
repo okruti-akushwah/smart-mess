@@ -3,6 +3,7 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from pydantic import BaseModel, Field, field_validator
 from app.menu_images import generate_menu_image, IMAGE_DIR
+from app.image_uploads import MAX_IMAGE_UPLOAD_BYTES, image_extension
 from app.routes.owner_meal_routes import require_owner
 
 router = APIRouter(prefix="/owner/menu-images", tags=["menu photos"])
@@ -33,15 +34,14 @@ async def generate(req: ImageRequest, owner=Depends(require_owner)):
 
 @router.post("/upload")
 async def upload(file: UploadFile = File(...), owner=Depends(require_owner)):
-    content = await file.read(5 * 1024 * 1024 + 1)
-    await file.close()
-    if len(content) > 5 * 1024 * 1024:
+    try:
+        content = await file.read(MAX_IMAGE_UPLOAD_BYTES + 1)
+    finally:
+        await file.close()
+    if len(content) > MAX_IMAGE_UPLOAD_BYTES:
         raise HTTPException(413, "Choose an image smaller than 5 MB")
-    if content.startswith(b"\x89PNG\r\n\x1a\n") and len(content) >= 45 and content[12:16] == b"IHDR" and content.endswith(b"IEND\xaeB`\x82"):
-        extension = ".png"
-    elif content.startswith(b"\xff\xd8\xff") and content.endswith(b"\xff\xd9") and len(content) >= 20:
-        extension = ".jpg"
-    else:
+    extension = image_extension(content, strict_png=True, strict_jpeg=True)
+    if extension is None:
         raise HTTPException(422, "Upload a PNG or JPEG photo")
     name = f"upload-{owner.id}-{uuid4().hex}{extension}"
     (IMAGE_DIR / name).write_bytes(content)
